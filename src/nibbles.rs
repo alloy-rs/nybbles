@@ -9,6 +9,16 @@ use smallvec::SmallVec;
 
 type Repr = SmallVec<[u8; 64]>;
 
+macro_rules! assume {
+    ($($t:tt)*) => {
+        if cfg!(debug_assertions) {
+            assert!($($t)*);
+        } else {
+            unsafe { core::hint::unreachable_unchecked() };
+        }
+    };
+}
+
 /// Structure representing a sequence of nibbles.
 ///
 /// A nibble is a 4-bit value, and this structure is used to store the nibble sequence representing
@@ -187,12 +197,15 @@ impl Nibbles {
     fn unpack_heap(data: &[u8]) -> Self {
         // Collect into a vec directly to avoid the smallvec overhead since we know this is going on
         // the heap.
+        debug_assert!(data.len() > 32);
         let unpacked_len = data.len() * 2;
         let mut nibbles = Vec::with_capacity(unpacked_len);
         // SAFETY: enough capacity.
         unsafe { Self::unpack_to(data, nibbles.as_mut_ptr()) };
         // SAFETY: within capacity and `unpack_to` initialized the memory.
         unsafe { nibbles.set_len(unpacked_len) };
+        // SAFETY: the capacity is greater than 64.
+        assume!(nibbles.capacity() > 64);
         Self(SmallVec::from_vec(nibbles))
     }
 
@@ -249,6 +262,8 @@ impl Nibbles {
         unsafe { self.pack_to(vec.as_mut_ptr()) };
         // SAFETY: within capacity and `pack_to` initialized the memory.
         unsafe { vec.set_len(packed_len) };
+        // SAFETY: the capacity is greater than 32.
+        assume!(vec.capacity() > 32);
         SmallVec::from_vec(vec)
     }
 
