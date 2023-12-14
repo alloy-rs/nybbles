@@ -1,14 +1,21 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+//! # nybbles
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#![warn(
+    missing_copy_implementations,
+    missing_debug_implementations,
+    missing_docs,
+    unreachable_pub,
+    clippy::missing_const_for_fn,
+    rustdoc::all
+)]
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
+#![deny(unused_must_use, rust_2018_idioms)]
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+#[macro_use]
+#[allow(unused_imports)]
+extern crate alloc;
+
+mod nibbles;
+pub use nibbles::Nibbles;
