@@ -119,6 +119,18 @@ impl Extend<u8> for Nibbles {
     }
 }
 
+impl<Idx> core::ops::Index<Idx> for Nibbles
+where
+    Repr: core::ops::Index<Idx>,
+{
+    type Output = <Repr as core::ops::Index<Idx>>::Output;
+
+    #[inline]
+    fn index(&self, index: Idx) -> &Self::Output {
+        self.0.index(index)
+    }
+}
+
 #[cfg(feature = "rlp")]
 impl alloy_rlp::Encodable for Nibbles {
     #[inline]
