@@ -168,9 +168,21 @@ impl Nibbles {
 
     /// Converts a byte slice into a [`Nibbles`] instance containing the nibbles (half-bytes or 4
     /// bits) that make up the input byte data.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::unpack(&[0xAB, 0xCD]);
+    /// assert_eq!(nibbles[..], [0x0A, 0x0B, 0x0C, 0x0D]);
+    /// ```
     #[inline]
     pub fn unpack<T: AsRef<[u8]>>(data: T) -> Self {
-        let data = data.as_ref();
+        Self::unpack_(data.as_ref())
+    }
+
+    #[inline]
+    fn unpack_(data: &[u8]) -> Self {
         if data.len() <= 32 {
             // SAFETY: checked length.
             unsafe { Self::unpack_stack(data) }
@@ -228,6 +240,14 @@ impl Nibbles {
     /// effectively reducing the size of the data by a factor of two.
     /// If the number of nibbles is odd, the last nibble is shifted left by 4 bits and
     /// added to the packed byte vector.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C, 0x0D]);
+    /// assert_eq!(nibbles.pack()[..], [0xAB, 0xCD]);
+    /// ```
     #[inline]
     pub fn pack(&self) -> SmallVec<[u8; 32]> {
         if self.len() <= 64 {
