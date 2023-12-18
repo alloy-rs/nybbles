@@ -131,6 +131,16 @@ where
     }
 }
 
+impl<Idx> core::ops::IndexMut<Idx> for Nibbles
+where
+    Repr: core::ops::IndexMut<Idx>,
+{
+    #[inline]
+    fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
+        self.0.index_mut(index)
+    }
+}
+
 #[cfg(feature = "rlp")]
 impl alloy_rlp::Encodable for Nibbles {
     #[inline]
@@ -618,6 +628,12 @@ impl Nibbles {
         self.0.push(nibble);
     }
 
+    /// Pops a nibble from the end of the current nibbles.
+    #[inline]
+    pub fn pop(&mut self) -> Option<u8> {
+        self.0.pop()
+    }
+
     /// Extend the current nibbles with another nibbles.
     #[inline]
     pub fn extend_from_slice(&mut self, b: impl AsRef<[u8]>) {
@@ -699,6 +715,25 @@ mod tests {
         test_slice(..RAW.len(), RAW);
         test_slice(0.., RAW);
         test_slice(0..RAW.len(), RAW);
+    }
+
+    #[test]
+    fn indexing() {
+        let mut nibbles = Nibbles::from_nibbles_unchecked(&[0x0A]);
+        assert_eq!(nibbles[0], 0x0A);
+        nibbles[0] = 0x0B;
+        assert_eq!(nibbles[0], 0x0B);
+    }
+
+    #[test]
+    fn push_pop() {
+        let mut nibbles = Nibbles::new();
+        nibbles.push(0x0A);
+        assert_eq!(nibbles[0], 0x0A);
+        assert_eq!(nibbles.len(), 1);
+
+        assert_eq!(nibbles.pop(), Some(0x0A));
+        assert_eq!(nibbles.len(), 0);
     }
 
     proptest! {
