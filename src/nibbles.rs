@@ -65,9 +65,7 @@ impl Clone for Nibbles {
 impl fmt::Debug for Nibbles {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Nibbles")
-            .field(&const_hex::encode(self.as_slice()))
-            .finish()
+        f.debug_tuple("Nibbles").field(&const_hex::encode(self.as_slice())).finish()
     }
 }
 
@@ -426,12 +424,7 @@ impl Nibbles {
     /// ```
     #[inline]
     pub unsafe fn get_byte_unchecked(&self, i: usize) -> u8 {
-        debug_assert!(
-            i + 1 < self.len(),
-            "index {i}..{} out of bounds of {}",
-            i + 1,
-            self.len()
-        );
+        debug_assert!(i + 1 < self.len(), "index {i}..{} out of bounds of {}", i + 1, self.len());
         let hi = *self.get_unchecked(i);
         let lo = *self.get_unchecked(i + 1);
         (hi << 4) | lo

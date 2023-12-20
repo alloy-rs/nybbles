@@ -8,9 +8,9 @@ rust-version = "1.64"
 license = "MIT OR Apache-2.0"
 categories = ["data-structures", "no-std"]
 keywords = ["nibbles", "vector", "ethereum"]
-homepage = "https://github.com/danipopes/nybbles"
-repository = "https://github.com/danipopes/nybbles"
-exclude = [".github/", "benches/", "fuzz/", "tests/"]
+homepage = "https://github.com/alloy-rs/nybbles"
+repository = "https://github.com/alloy-rs/nybbles"
+exclude = [".github/", "deny.toml", "release.toml", "rustfmt.toml"]
 
 [dependencies]
 smallvec = { version = "1.0", default-features = false, features = ["const_new", "union"] }
