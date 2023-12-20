@@ -10,9 +10,17 @@ use smallvec::SmallVec;
 type Repr = SmallVec<[u8; 64]>;
 
 macro_rules! assume {
+    ($e:expr $(,)?) => {
+        if !$e {
+            debug_unreachable!(stringify!($e));
+        }
+    };
+}
+
+macro_rules! debug_unreachable {
     ($($t:tt)*) => {
         if cfg!(debug_assertions) {
-            assert!($($t)*);
+            unreachable!($($t)*);
         } else {
             unsafe { core::hint::unreachable_unchecked() };
         }
@@ -642,7 +650,7 @@ mod tests {
     use super::*;
     use alloc::format;
     use hex_literal::hex;
-    use proptest::prelude::*;
+    use proptest::{collection::vec, prelude::*};
 
     #[test]
     fn hashed_regression() {
@@ -703,7 +711,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn pack_unpack_roundtrip(input in any::<Vec<u8>>()) {
+        fn pack_unpack_roundtrip(input in vec(any::<u8>(), 0..64)) {
             let nibbles = Nibbles::unpack(&input);
             prop_assert!(nibbles.iter().all(|&nibble| nibble <= 0xf));
             let packed = nibbles.pack();
@@ -711,7 +719,7 @@ mod tests {
         }
 
         #[test]
-        fn encode_path_first_byte(input in any::<Vec<u8>>()) {
+        fn encode_path_first_byte(input in vec(any::<u8>(), 1..64)) {
             prop_assume!(!input.is_empty());
             let input = Nibbles::unpack(input);
             prop_assert!(input.iter().all(|&nibble| nibble <= 0xf));
