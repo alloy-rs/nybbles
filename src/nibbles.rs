@@ -131,16 +131,6 @@ where
     }
 }
 
-impl<Idx> core::ops::IndexMut<Idx> for Nibbles
-where
-    Repr: core::ops::IndexMut<Idx>,
-{
-    #[inline]
-    fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
-        self.0.index_mut(index)
-    }
-}
-
 #[cfg(feature = "rlp")]
 impl alloy_rlp::Encodable for Nibbles {
     #[inline]
@@ -562,6 +552,16 @@ impl Nibbles {
         self[i] as usize
     }
 
+    /// Sets the nibble at the given index
+    ///
+    /// # Panics
+    ///
+    /// Panics if the index is out of bounds.
+    #[inline]
+    pub fn set_at(&mut self, i: usize, value: u8) {
+        self.0[i] = value;
+    }
+
     /// Returns the first nibble of the current nibble sequence.
     #[inline]
     pub fn first(&self) -> Option<u8> {
@@ -720,9 +720,9 @@ mod tests {
     #[test]
     fn indexing() {
         let mut nibbles = Nibbles::from_nibbles_unchecked(&[0x0A]);
-        assert_eq!(nibbles[0], 0x0A);
-        nibbles[0] = 0x0B;
-        assert_eq!(nibbles[0], 0x0B);
+        assert_eq!(nibbles.at(0), 0x0A);
+        nibbles.set_at(0, 0x0B);
+        assert_eq!(nibbles.at(0), 0x0B);
     }
 
     #[test]
