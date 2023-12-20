@@ -560,6 +560,16 @@ impl Nibbles {
         self[i] as usize
     }
 
+    /// Sets the nibble at the given index
+    ///
+    /// # Panics
+    ///
+    /// Panics if the index is out of bounds.
+    #[inline]
+    pub fn set_at(&mut self, i: usize, value: u8) {
+        self.0[i] = value;
+    }
+
     /// Returns the first nibble of the current nibble sequence.
     #[inline]
     pub fn first(&self) -> Option<u8> {
@@ -624,6 +634,12 @@ impl Nibbles {
     #[inline]
     pub fn push(&mut self, nibble: u8) {
         self.0.push(nibble);
+    }
+
+    /// Pops a nibble from the end of the current nibbles.
+    #[inline]
+    pub fn pop(&mut self) -> Option<u8> {
+        self.0.pop()
     }
 
     /// Extend the current nibbles with another nibbles.
@@ -707,6 +723,25 @@ mod tests {
         test_slice(..RAW.len(), RAW);
         test_slice(0.., RAW);
         test_slice(0..RAW.len(), RAW);
+    }
+
+    #[test]
+    fn indexing() {
+        let mut nibbles = Nibbles::from_nibbles_unchecked(&[0x0A]);
+        assert_eq!(nibbles.at(0), 0x0A);
+        nibbles.set_at(0, 0x0B);
+        assert_eq!(nibbles.at(0), 0x0B);
+    }
+
+    #[test]
+    fn push_pop() {
+        let mut nibbles = Nibbles::new();
+        nibbles.push(0x0A);
+        assert_eq!(nibbles[0], 0x0A);
+        assert_eq!(nibbles.len(), 1);
+
+        assert_eq!(nibbles.pop(), Some(0x0A));
+        assert_eq!(nibbles.len(), 0);
     }
 
     proptest! {
