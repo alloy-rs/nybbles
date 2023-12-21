@@ -179,6 +179,12 @@ impl Nibbles {
     pub const fn new() -> Self {
         Self(SmallVec::new_const())
     }
+    /// Returns an iterator over the nibbles in the `Nibbles` instance.
+
+    #[inline]
+    pub fn iter(&self) -> NibbleIterator<'_> {
+        NibbleIterator::new(self)
+    }
 
     /// Creates a new [`Nibbles`] instance with the given capacity.
     ///
@@ -653,7 +659,34 @@ impl Nibbles {
         self.0.clear();
     }
 }
+/// An iterator over the nibbles in a `Nibbles` instance.
+#[derive(Debug)]
+pub struct NibbleIterator<'a> {
+    nibbles: &'a Nibbles,
+    index: usize,
+}
 
+impl<'a> NibbleIterator<'a> {
+    /// Creates a new iterator for the given `Nibbles` instance.
+
+    pub fn new(nibbles: &'a Nibbles) -> Self {
+        NibbleIterator { nibbles, index: 0 }
+    }
+}
+
+impl<'a> Iterator for NibbleIterator<'a> {
+    type Item = u8;
+    /// Advances the iterator and returns the next nibble, or `None` if the end has been reached.
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.nibbles.len() {
+            return None;
+        }
+        let nibbles = self.nibbles.0[self.index];
+        self.index += 1;
+        Some(nibbles)
+    }
+}
 #[cfg(all(test, feature = "arbitrary"))]
 mod tests {
     use super::*;
