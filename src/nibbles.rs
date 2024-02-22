@@ -397,13 +397,9 @@ impl Nibbles {
     /// assert_eq!(nibbles.get_byte(2), Some(0xCD));
     /// assert_eq!(nibbles.get_byte(3), None);
     /// ```
-    ///
-    /// # Panics
-    ///
-    /// If `i` equals to [usize::MAX] and next consecutive byte overflows.
     #[inline]
     pub fn get_byte(&self, i: usize) -> Option<u8> {
-        if i.checked_add(1).expect("overflow") < self.len() {
+        if i.checked_add(1)? < self.len() {
             Some(unsafe { self.get_byte_unchecked(i) })
         } else {
             None
@@ -742,13 +738,10 @@ mod tests {
     }
 
     /// Test panic out-of-bound memory read.
-    /// This test only makes sense with no debug assertions in std environment.
-    #[cfg(all(feature = "std", not(debug_assertions)))]
     #[test]
     fn get_byte_max() {
         let nibbles = Nibbles::from_nibbles_unchecked([0x0A, 0x0B, 0x0C, 0x0D]);
-        let result = std::panic::catch_unwind(|| nibbles.get_byte(usize::MAX));
-        assert!(result.is_err());
+        assert_eq!(nibbles.get_byte(usize::MAX), None);
     }
 
     #[cfg(feature = "arbitrary")]
