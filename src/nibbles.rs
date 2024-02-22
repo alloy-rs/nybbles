@@ -399,7 +399,7 @@ impl Nibbles {
     /// ```
     #[inline]
     pub fn get_byte(&self, i: usize) -> Option<u8> {
-        if i + 1 < self.len() {
+        if i.checked_add(1)? < self.len() {
             Some(unsafe { self.get_byte_unchecked(i) })
         } else {
             None
@@ -735,6 +735,12 @@ mod tests {
 
         assert_eq!(nibbles.pop(), Some(0x0A));
         assert_eq!(nibbles.len(), 0);
+    }
+
+    #[test]
+    fn get_byte_max() {
+        let nibbles = Nibbles::from_nibbles_unchecked([0x0A, 0x0B, 0x0C, 0x0D]);
+        assert_eq!(nibbles.get_byte(usize::MAX), None);
     }
 
     #[cfg(feature = "arbitrary")]
