@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use core::{
     borrow::Borrow,
     fmt,
@@ -6,6 +5,9 @@ use core::{
     ops::{Bound, RangeBounds},
 };
 use smallvec::SmallVec;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 type Repr = SmallVec<[u8; 64]>;
 
@@ -654,12 +656,10 @@ impl Nibbles {
     }
 }
 
-#[cfg(all(test, feature = "arbitrary"))]
+#[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::format;
     use hex_literal::hex;
-    use proptest::{collection::vec, prelude::*};
 
     #[test]
     fn hashed_regression() {
@@ -720,7 +720,7 @@ mod tests {
 
     #[test]
     fn indexing() {
-        let mut nibbles = Nibbles::from_nibbles_unchecked(&[0x0A]);
+        let mut nibbles = Nibbles::from_nibbles_unchecked([0x0A]);
         assert_eq!(nibbles.at(0), 0x0A);
         nibbles.set_at(0, 0x0B);
         assert_eq!(nibbles.at(0), 0x0B);
@@ -737,39 +737,45 @@ mod tests {
         assert_eq!(nibbles.len(), 0);
     }
 
-    proptest! {
-        #[test]
-        fn pack_unpack_roundtrip(input in vec(any::<u8>(), 0..64)) {
-            let nibbles = Nibbles::unpack(&input);
-            prop_assert!(nibbles.iter().all(|&nibble| nibble <= 0xf));
-            let packed = nibbles.pack();
-            prop_assert_eq!(&packed[..], input);
-        }
+    #[cfg(feature = "arbitrary")]
+    mod arbitrary {
+        use super::*;
+        use proptest::{collection::vec, prelude::*};
 
-        #[test]
-        fn encode_path_first_byte(input in vec(any::<u8>(), 1..64)) {
-            prop_assume!(!input.is_empty());
-            let input = Nibbles::unpack(input);
-            prop_assert!(input.iter().all(|&nibble| nibble <= 0xf));
-            let input_is_odd = input.len() % 2 == 1;
-
-            let compact_leaf = input.encode_path_leaf(true);
-            let leaf_flag = compact_leaf[0];
-            // Check flag
-            assert_ne!(leaf_flag & 0x20, 0);
-            assert_eq!(input_is_odd, (leaf_flag & 0x10) != 0);
-            if input_is_odd {
-                assert_eq!(leaf_flag & 0x0f, input.first().unwrap());
+        proptest::proptest! {
+            #[test]
+            fn pack_unpack_roundtrip(input in vec(any::<u8>(), 0..64)) {
+                let nibbles = Nibbles::unpack(&input);
+                prop_assert!(nibbles.iter().all(|&nibble| nibble <= 0xf));
+                let packed = nibbles.pack();
+                prop_assert_eq!(&packed[..], input);
             }
 
+            #[test]
+            fn encode_path_first_byte(input in vec(any::<u8>(), 1..64)) {
+                prop_assume!(!input.is_empty());
+                let input = Nibbles::unpack(input);
+                prop_assert!(input.iter().all(|&nibble| nibble <= 0xf));
+                let input_is_odd = input.len() % 2 == 1;
 
-            let compact_extension = input.encode_path_leaf(false);
-            let extension_flag = compact_extension[0];
-            // Check first byte
-            assert_eq!(extension_flag & 0x20, 0);
-            assert_eq!(input_is_odd, (extension_flag & 0x10) != 0);
-            if input_is_odd {
-                assert_eq!(extension_flag & 0x0f, input.first().unwrap());
+                let compact_leaf = input.encode_path_leaf(true);
+                let leaf_flag = compact_leaf[0];
+                // Check flag
+                assert_ne!(leaf_flag & 0x20, 0);
+                assert_eq!(input_is_odd, (leaf_flag & 0x10) != 0);
+                if input_is_odd {
+                    assert_eq!(leaf_flag & 0x0f, input.first().unwrap());
+                }
+
+
+                let compact_extension = input.encode_path_leaf(false);
+                let extension_flag = compact_extension[0];
+                // Check first byte
+                assert_eq!(extension_flag & 0x20, 0);
+                assert_eq!(input_is_odd, (extension_flag & 0x10) != 0);
+                if input_is_odd {
+                    assert_eq!(extension_flag & 0x0f, input.first().unwrap());
+                }
             }
         }
     }
