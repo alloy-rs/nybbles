@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use core::{
     borrow::Borrow,
     fmt,
@@ -6,6 +5,9 @@ use core::{
     ops::{Bound, RangeBounds},
 };
 use smallvec::SmallVec;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 type Repr = SmallVec<[u8; 64]>;
 
