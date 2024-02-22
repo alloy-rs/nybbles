@@ -720,7 +720,7 @@ mod tests {
 
     #[test]
     fn indexing() {
-        let mut nibbles = Nibbles::from_nibbles_unchecked(&[0x0A]);
+        let mut nibbles = Nibbles::from_nibbles_unchecked([0x0A]);
         assert_eq!(nibbles.at(0), 0x0A);
         nibbles.set_at(0, 0x0B);
         assert_eq!(nibbles.at(0), 0x0B);
