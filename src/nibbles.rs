@@ -737,7 +737,6 @@ mod tests {
         assert_eq!(nibbles.len(), 0);
     }
 
-    /// Test panic out-of-bound memory read.
     #[test]
     fn get_byte_max() {
         let nibbles = Nibbles::from_nibbles_unchecked([0x0A, 0x0B, 0x0C, 0x0D]);
