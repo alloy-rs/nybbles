@@ -159,16 +159,16 @@ impl alloy_rlp::Encodable for Nibbles {
 
 #[cfg(feature = "arbitrary")]
 impl proptest::arbitrary::Arbitrary for Nibbles {
-    type Parameters = ();
+    type Parameters = proptest::collection::SizeRange;
     type Strategy = proptest::strategy::Map<
         proptest::collection::VecStrategy<core::ops::RangeInclusive<u8>>,
         fn(Vec<u8>) -> Self,
     >;
 
     #[inline]
-    fn arbitrary_with((): ()) -> Self::Strategy {
+    fn arbitrary_with(size: proptest::collection::SizeRange) -> Self::Strategy {
         use proptest::prelude::*;
-        proptest::collection::vec(0x0..=0xf, 0..64).prop_map(Self::from_nibbles_unchecked)
+        proptest::collection::vec(0x0..=0xf, size).prop_map(Self::from_nibbles_unchecked)
     }
 }
 
