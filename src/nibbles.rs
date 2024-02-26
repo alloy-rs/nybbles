@@ -1,9 +1,4 @@
-use core::{
-    borrow::Borrow,
-    fmt,
-    mem::MaybeUninit,
-    ops::{Bound, RangeBounds},
-};
+use core::{borrow::Borrow, fmt, mem::MaybeUninit, ops::Index};
 use smallvec::SmallVec;
 
 #[cfg(not(feature = "std"))]
@@ -602,18 +597,11 @@ impl Nibbles {
     /// Panics if the range is out of bounds.
     #[inline]
     #[track_caller]
-    pub fn slice(&self, range: impl RangeBounds<usize>) -> Self {
-        let start = match range.start_bound() {
-            Bound::Included(&n) => n,
-            Bound::Excluded(&n) => n.checked_add(1).expect("out of range"),
-            Bound::Unbounded => 0,
-        };
-        let end = match range.end_bound() {
-            Bound::Included(&n) => n.checked_add(1).expect("out of range"),
-            Bound::Excluded(&n) => n,
-            Bound::Unbounded => self.len(),
-        };
-        Self::from_nibbles_unchecked(&self[start..end])
+    pub fn slice<I>(&self, range: I) -> Self
+    where
+        Self: Index<I, Output = [u8]>,
+    {
+        Self::from_nibbles_unchecked(&self[range])
     }
 
     /// Join two nibbles together.
@@ -693,7 +681,10 @@ mod tests {
         const RAW: &[u8] = &hex!("05010406040a040203030f010805020b050c04070003070e0909070f010b0a0805020301070c0a0902040b0f000f0006040a04050f020b090701000a0a040b");
 
         #[track_caller]
-        fn test_slice(range: impl RangeBounds<usize>, expected: &[u8]) {
+        fn test_slice<I>(range: I, expected: &[u8])
+        where
+            Nibbles: Index<I, Output = [u8]>,
+        {
             let nibbles = Nibbles::from_nibbles_unchecked(RAW);
             let sliced = nibbles.slice(range);
             assert_eq!(sliced, Nibbles::from_nibbles_unchecked(expected));
