@@ -262,8 +262,9 @@ impl Nibbles {
         // Collect into a vec directly to avoid the smallvec overhead since we know this is going on
         // the heap.
         debug_assert!(data.len() > 32);
-        let Some(unpacked_len) = data.len().checked_mul(2) else {
-            panic!("trying to unpack usize::MAX / 2 bytes");
+        let unpacked_len = match data.len().checked_mul(2) {
+            Some(unpacked_len) => unpacked_len,
+            None => panic!("trying to unpack usize::MAX / 2 bytes"),
         };
         let mut nibbles = Vec::with_capacity(unpacked_len);
         // SAFETY: enough capacity.
