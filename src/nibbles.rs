@@ -277,6 +277,7 @@ impl Nibbles {
     /// let nibbles = Nibbles::from_vec(vec![0xFF]);
     /// ```
     #[inline]
+    #[track_caller]
     pub fn from_vec(vec: Vec<u8>) -> Self {
         if !vec.iter().all(|&x| x <= 0xf) {
             panic_invalid_nibbles();
@@ -675,7 +676,7 @@ impl Nibbles {
     #[track_caller]
     pub fn set_at(&mut self, i: usize, value: u8) {
         assert!(value <= 0xf);
-        self.0[i] = value;
+        self.set_at_unchecked(i, value);
     }
 
     /// Sets the nibble at the given index, without checking its validity.
