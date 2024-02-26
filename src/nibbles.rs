@@ -30,8 +30,31 @@ macro_rules! unsafe_unreachable {
 /// the keys in a Merkle Patricia Trie (MPT).
 /// Using nibbles simplifies trie operations and enables consistent key representation in the MPT.
 ///
-/// The internal representation is a [`SmallVec`] that stores one nibble per byte. This means that
-/// each byte has its upper 4 bits set to zero and the lower 4 bits representing the nibble value.
+/// # Internal representation
+///
+/// The internal representation is currently a [`SmallVec`] that stores one nibble per byte. Nibbles
+/// are stored inline (on the stack) up to a length of 64 nibbles, or 32 unpacked bytes. This means
+/// that each byte has its upper 4 bits set to zero and the lower 4 bits representing the nibble
+/// value.
+///
+/// This is enforced in the public API, but it is possible to create invalid [`Nibbles`] instances
+/// using methods suffixed with `_unchecked`. These methods are not marked as `unsafe` as they
+/// are not memory-unsafe, but creating invalid values will cause unexpected behavior in other
+/// methods, and users should exercise caution when using them.
+///
+/// # Examples
+///
+/// ```
+/// use nybbles::Nibbles;
+///
+/// let bytes = [0xAB, 0xCD];
+/// let nibbles = Nibbles::unpack(&bytes);
+/// assert_eq!(nibbles, Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]));
+/// assert_eq!(nibbles[..], [0x0A, 0x0B, 0x0C, 0x0D]);
+///
+/// let packed = nibbles.pack();
+/// assert_eq!(&packed[..], &bytes[..]);
+/// ```
 #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -46,7 +69,8 @@ impl core::ops::Deref for Nibbles {
     }
 }
 
-// Override `SmallVec::from` since it's not specialized for `Copy` types.
+// Override `SmallVec::from` in the default `Clone` implementation since it's not specialized for
+// `Copy` types.
 impl Clone for Nibbles {
     #[inline]
     fn clone(&self) -> Self {
@@ -63,13 +87,6 @@ impl fmt::Debug for Nibbles {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Nibbles").field(&const_hex::encode(self.as_slice())).finish()
-    }
-}
-
-impl From<Vec<u8>> for Nibbles {
-    #[inline]
-    fn from(value: Vec<u8>) -> Self {
-        Self(SmallVec::from_vec(value))
     }
 }
 
@@ -112,13 +129,6 @@ impl Borrow<[u8]> for Nibbles {
     #[inline]
     fn borrow(&self) -> &[u8] {
         self.as_slice()
-    }
-}
-
-impl Extend<u8> for Nibbles {
-    #[inline]
-    fn extend<T: IntoIterator<Item = u8>>(&mut self, iter: T) {
-        self.0.extend(iter)
     }
 }
 
@@ -191,7 +201,43 @@ impl Nibbles {
         Self(SmallVec::with_capacity(capacity))
     }
 
-    /// Creates a new [`Nibbles`] instance from nibble bytes, without checking their validity.
+    /// Creates a new [`Nibbles`] instance by copying the given bytes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the any of the bytes is not a valid nibble (`0..=0x0f`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
+    /// assert_eq!(nibbles[..], [0x0A, 0x0B, 0x0C, 0x0D]);
+    /// ```
+    ///
+    /// Invalid values will cause panics:
+    ///
+    /// ```should_panic
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::from_nibbles(&[0xFF]);
+    /// ```
+    #[inline]
+    #[track_caller]
+    pub fn from_nibbles<T: AsRef<[u8]>>(bytes: T) -> Self {
+        let bytes = bytes.as_ref();
+        if !bytes.iter().all(|&x| x <= 0xf) {
+            panic_invalid_nibbles();
+        }
+        Self::from_nibbles_unchecked(bytes)
+    }
+
+    /// Creates a new [`Nibbles`] instance by copying the given bytes, without checking their
+    /// validity.
+    ///
+    /// This will not unpack the bytes into nibbles, and will instead store the bytes as-is.
+    ///
+    /// Note that it is possible to create a [`Nibbles`] instance with invalid nibble values (i.e.
+    /// values greater than 0xf) using this method. See [the type docs](Self) for more details.
     ///
     /// # Examples
     ///
@@ -199,10 +245,64 @@ impl Nibbles {
     /// # use nybbles::Nibbles;
     /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C, 0x0D]);
     /// assert_eq!(nibbles[..], [0x0A, 0x0B, 0x0C, 0x0D]);
+    ///
+    /// // Invalid value!
+    /// let nibbles = Nibbles::from_nibbles_unchecked(&[0xFF]);
+    /// assert_eq!(nibbles[..], [0xFF]);
     /// ```
     #[inline]
     pub fn from_nibbles_unchecked<T: AsRef<[u8]>>(nibbles: T) -> Self {
         Self(SmallVec::from_slice(nibbles.as_ref()))
+    }
+
+    /// Creates a new [`Nibbles`] instance from a byte vector, without checking its validity.
+    ///
+    /// This will not unpack the bytes into nibbles, and will instead store the bytes as-is.
+    ///
+    /// Note that it is possible to create a [`Nibbles`] instance with invalid nibble values (i.e.
+    /// values greater than 0xf) using this method. See [the type docs](Self) for more details.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::from_vec_unchecked(vec![0x0A, 0x0B, 0x0C, 0x0D]);
+    /// assert_eq!(nibbles[..], [0x0A, 0x0B, 0x0C, 0x0D]);
+    /// ```
+    ///
+    /// Invalid values will cause panics:
+    ///
+    /// ```should_panic
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::from_vec(vec![0xFF]);
+    /// ```
+    #[inline]
+    pub fn from_vec(vec: Vec<u8>) -> Self {
+        if !vec.iter().all(|&x| x <= 0xf) {
+            panic_invalid_nibbles();
+        }
+        Self::from_vec_unchecked(vec)
+    }
+
+    /// Creates a new [`Nibbles`] instance from a byte vector, without checking its validity.
+    ///
+    /// Note that it is possible to create a [`Nibbles`] instance with invalid nibble values (i.e.
+    /// values greater than 0xf) using this method. See [the type docs](Self) for more details.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::from_vec_unchecked(vec![0x0A, 0x0B, 0x0C, 0x0D]);
+    /// assert_eq!(nibbles[..], [0x0A, 0x0B, 0x0C, 0x0D]);
+    ///
+    /// // Invalid value!
+    /// let nibbles = Nibbles::from_vec_unchecked(vec![0xFF]);
+    /// assert_eq!(nibbles[..], [0xFF]);
+    /// ```
+    #[inline]
+    pub fn from_vec_unchecked(vec: Vec<u8>) -> Self {
+        Self(SmallVec::from_vec(vec))
     }
 
     /// Converts a byte slice into a [`Nibbles`] instance containing the nibbles (half-bytes or 4
@@ -295,7 +395,7 @@ impl Nibbles {
     ///
     /// ```
     /// # use nybbles::Nibbles;
-    /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C, 0x0D]);
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
     /// assert_eq!(nibbles.pack()[..], [0xAB, 0xCD]);
     /// ```
     #[inline]
@@ -349,7 +449,7 @@ impl Nibbles {
     ///
     /// ```
     /// # use nybbles::Nibbles;
-    /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C, 0x0D]);
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
     /// let mut packed = [0; 2];
     /// nibbles.pack_to(&mut packed);
     /// assert_eq!(packed[..], [0xAB, 0xCD]);
@@ -374,7 +474,7 @@ impl Nibbles {
     ///
     /// ```
     /// # use nybbles::Nibbles;
-    /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C, 0x0D]);
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
     /// let mut packed = [0; 2];
     /// // SAFETY: enough capacity.
     /// unsafe { nibbles.pack_to_unchecked(packed.as_mut_ptr()) };
@@ -397,7 +497,7 @@ impl Nibbles {
     ///
     /// ```
     /// # use nybbles::Nibbles;
-    /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C, 0x0D]);
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
     /// assert_eq!(nibbles.get_byte(0), Some(0xAB));
     /// assert_eq!(nibbles.get_byte(1), Some(0xBC));
     /// assert_eq!(nibbles.get_byte(2), Some(0xCD));
@@ -422,7 +522,7 @@ impl Nibbles {
     ///
     /// ```
     /// # use nybbles::Nibbles;
-    /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C, 0x0D]);
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
     /// // SAFETY: in range.
     /// unsafe {
     ///     assert_eq!(nibbles.get_byte_unchecked(0), 0xAB);
@@ -474,19 +574,19 @@ impl Nibbles {
     /// ```
     /// # use nybbles::Nibbles;
     /// // Extension node with an even path length:
-    /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C, 0x0D]);
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
     /// assert_eq!(nibbles.encode_path_leaf(false)[..], [0x00, 0xAB, 0xCD]);
     ///
     /// // Extension node with an odd path length:
-    /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C]);
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C]);
     /// assert_eq!(nibbles.encode_path_leaf(false)[..], [0x1A, 0xBC]);
     ///
     /// // Leaf node with an even path length:
-    /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C, 0x0D]);
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
     /// assert_eq!(nibbles.encode_path_leaf(true)[..], [0x20, 0xAB, 0xCD]);
     ///
     /// // Leaf node with an odd path length:
-    /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C]);
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C]);
     /// assert_eq!(nibbles.encode_path_leaf(true)[..], [0x3A, 0xBC]);
     /// ```
     #[inline]
@@ -549,7 +649,7 @@ impl Nibbles {
         self.last() == Some(16)
     }
 
-    /// Returns `true` if the current nibble sequence starts with the given prefix.
+    /// Returns `true` if this nibble sequence starts with the given prefix.
     #[inline]
     pub fn has_prefix(&self, other: &[u8]) -> bool {
         self.starts_with(other)
@@ -566,29 +666,42 @@ impl Nibbles {
         self[i] as usize
     }
 
-    /// Sets the nibble at the given index
+    /// Sets the nibble at the given index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the index is out of bounds, or if `value` is not a valid nibble (`0..=0x0f`).
+    #[inline]
+    #[track_caller]
+    pub fn set_at(&mut self, i: usize, value: u8) {
+        assert!(value <= 0xf);
+        self.0[i] = value;
+    }
+
+    /// Sets the nibble at the given index, without checking its validity.
     ///
     /// # Panics
     ///
     /// Panics if the index is out of bounds.
     #[inline]
-    pub fn set_at(&mut self, i: usize, value: u8) {
+    #[track_caller]
+    pub fn set_at_unchecked(&mut self, i: usize, value: u8) {
         self.0[i] = value;
     }
 
-    /// Returns the first nibble of the current nibble sequence.
+    /// Returns the first nibble of this nibble sequence.
     #[inline]
     pub fn first(&self) -> Option<u8> {
         self.0.first().copied()
     }
 
-    /// Returns the last nibble of the current nibble sequence.
+    /// Returns the last nibble of this nibble sequence.
     #[inline]
     pub fn last(&self) -> Option<u8> {
         self.0.last().copied()
     }
 
-    /// Returns the length of the common prefix between the current nibble sequence and the given.
+    /// Returns the length of the common prefix between this nibble sequence and the given.
     #[inline]
     pub fn common_prefix_length(&self, other: &[u8]) -> usize {
         let len = core::cmp::min(self.len(), other.len());
@@ -600,10 +713,28 @@ impl Nibbles {
         len
     }
 
-    /// Returns the nibbles as a byte slice.
+    /// Returns a reference to the underlying byte slice.
     #[inline]
     pub fn as_slice(&self) -> &[u8] {
         &self.0
+    }
+
+    /// Returns a mutable reference to the underlying byte slice.
+    ///
+    /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
+    /// [the type docs](Self) for more details.
+    #[inline]
+    pub fn as_mut_slice_unchecked(&mut self) -> &mut [u8] {
+        &mut self.0
+    }
+
+    /// Returns a mutable reference to the underlying byte vector.
+    ///
+    /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
+    /// [the type docs](Self) for more details.
+    #[inline]
+    pub fn as_mut_vec_unchecked(&mut self) -> &mut Repr {
+        &mut self.0
     }
 
     /// Slice the current nibbles within the provided index range.
@@ -630,8 +761,23 @@ impl Nibbles {
     }
 
     /// Pushes a nibble to the end of the current nibbles.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the nibble is not a valid nibble (`0..=0x0f`).
     #[inline]
+    #[track_caller]
     pub fn push(&mut self, nibble: u8) {
+        assert!(nibble <= 0xf);
+        self.push_unchecked(nibble);
+    }
+
+    /// Pushes a nibble to the end of the current nibbles without checking its validity.
+    ///
+    /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
+    /// [the type docs](Self) for more details.
+    #[inline]
+    pub fn push_unchecked(&mut self, nibble: u8) {
         self.0.push(nibble);
     }
 
@@ -643,8 +789,17 @@ impl Nibbles {
 
     /// Extend the current nibbles with another nibbles.
     #[inline]
-    pub fn extend_from_slice(&mut self, b: impl AsRef<[u8]>) {
-        self.0.extend_from_slice(b.as_ref());
+    pub fn extend_from_slice(&mut self, b: &Nibbles) {
+        self.0.extend_from_slice(b.as_slice());
+    }
+
+    /// Extend the current nibbles with another byte slice.
+    ///
+    /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
+    /// [the type docs](Self) for more details.
+    #[inline]
+    pub fn extend_from_slice_unchecked(&mut self, b: &[u8]) {
+        self.0.extend_from_slice(b);
     }
 
     /// Truncates the current nibbles to the given length.
@@ -660,6 +815,12 @@ impl Nibbles {
     }
 }
 
+#[cold]
+#[track_caller]
+const fn panic_invalid_nibbles() -> ! {
+    panic!("attempted to create invalid nibbles");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -667,7 +828,7 @@ mod tests {
 
     #[test]
     fn hashed_regression() {
-        let nibbles = Nibbles::from_nibbles_unchecked(hex!("05010406040a040203030f010805020b050c04070003070e0909070f010b0a0805020301070c0a0902040b0f000f0006040a04050f020b090701000a0a040b"));
+        let nibbles = Nibbles::from_nibbles(hex!("05010406040a040203030f010805020b050c04070003070e0909070f010b0a0805020301070c0a0902040b0f000f0006040a04050f020b090701000a0a040b"));
         let path = nibbles.encode_path_leaf(true);
         let expected = hex!("351464a4233f1852b5c47037e997f1ba852317ca924bf0f064a45f2b9710aa4b");
         assert_eq!(path[..], expected);
@@ -686,7 +847,7 @@ mod tests {
         ];
         for (input, expected) in tests {
             assert!(input.iter().all(|&x| x <= 0xf));
-            let nibbles = Nibbles::from_nibbles_unchecked(input);
+            let nibbles = Nibbles::from_nibbles(input);
             let encoded = nibbles.pack();
             assert_eq!(&encoded[..], expected);
         }
@@ -703,7 +864,7 @@ mod tests {
         {
             let nibbles = Nibbles::from_nibbles_unchecked(RAW);
             let sliced = nibbles.slice(range);
-            assert_eq!(sliced, Nibbles::from_nibbles_unchecked(expected));
+            assert_eq!(sliced, Nibbles::from_nibbles(expected));
             assert_eq!(sliced.as_slice(), expected);
         }
 
@@ -727,7 +888,7 @@ mod tests {
 
     #[test]
     fn indexing() {
-        let mut nibbles = Nibbles::from_nibbles_unchecked([0x0A]);
+        let mut nibbles = Nibbles::from_nibbles([0x0A]);
         assert_eq!(nibbles.at(0), 0x0A);
         nibbles.set_at(0, 0x0B);
         assert_eq!(nibbles.at(0), 0x0B);
@@ -746,7 +907,7 @@ mod tests {
 
     #[test]
     fn get_byte_max() {
-        let nibbles = Nibbles::from_nibbles_unchecked([0x0A, 0x0B, 0x0C, 0x0D]);
+        let nibbles = Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]);
         assert_eq!(nibbles.get_byte(usize::MAX), None);
     }
 
