@@ -213,6 +213,10 @@ impl Nibbles {
     /// Converts a byte slice into a [`Nibbles`] instance containing the nibbles (half-bytes or 4
     /// bits) that make up the input byte data.
     ///
+    /// # Panics
+    ///
+    /// Panics if the length of the input is greater than `usize::MAX / 2`.
+    ///
     /// # Examples
     ///
     /// ```
@@ -249,12 +253,18 @@ impl Nibbles {
     }
 
     /// Unpacks on the heap.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the length of the input is greater than `usize::MAX / 2`.
     #[inline]
     fn unpack_heap(data: &[u8]) -> Self {
         // Collect into a vec directly to avoid the smallvec overhead since we know this is going on
         // the heap.
         debug_assert!(data.len() > 32);
-        let unpacked_len = data.len() * 2;
+        let Some(unpacked_len) = data.len().checked_mul(2) else {
+            panic!("trying to unpack usize::MAX / 2 bytes");
+        };
         let mut nibbles = Vec::with_capacity(unpacked_len);
         // SAFETY: enough capacity.
         unsafe { Self::unpack_to_unchecked(data, nibbles.as_mut_ptr()) };
