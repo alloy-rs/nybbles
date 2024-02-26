@@ -258,7 +258,7 @@ impl Nibbles {
         let mut nibbles = Vec::with_capacity(unpacked_len);
         // SAFETY: enough capacity.
         unsafe { Self::unpack_to_unchecked(data, nibbles.as_mut_ptr()) };
-        // SAFETY: within capacity and `unpack_to` initialized the memory.
+        // SAFETY: within capacity and `unpack_to_unchecked` initialized the memory.
         unsafe { nibbles.set_len(unpacked_len) };
         // SAFETY: the capacity is greater than 64.
         unsafe_assume!(nibbles.capacity() > 64);
@@ -324,7 +324,7 @@ impl Nibbles {
         let mut vec = Vec::with_capacity(packed_len);
         // SAFETY: enough capacity.
         unsafe { self.pack_to_unchecked(vec.as_mut_ptr()) };
-        // SAFETY: within capacity and `pack_to` initialized the memory.
+        // SAFETY: within capacity and `pack_to_unchecked` initialized the memory.
         unsafe { vec.set_len(packed_len) };
         // SAFETY: the capacity is greater than 32.
         unsafe_assume!(vec.capacity() > 32);
@@ -399,7 +399,7 @@ impl Nibbles {
     /// ```
     #[inline]
     pub fn get_byte(&self, i: usize) -> Option<u8> {
-        if i.checked_add(1)? < self.len() {
+        if (i < usize::MAX) & (i.wrapping_add(1) < self.len()) {
             Some(unsafe { self.get_byte_unchecked(i) })
         } else {
             None
@@ -426,7 +426,12 @@ impl Nibbles {
     /// ```
     #[inline]
     pub unsafe fn get_byte_unchecked(&self, i: usize) -> u8 {
-        debug_assert!(i + 1 < self.len(), "index {i}..{} out of bounds of {}", i + 1, self.len());
+        debug_assert!(
+            i < usize::MAX && i + 1 < self.len(),
+            "index {i}..{} out of bounds of {}",
+            i + 1,
+            self.len()
+        );
         let hi = *self.get_unchecked(i);
         let lo = *self.get_unchecked(i + 1);
         (hi << 4) | lo
