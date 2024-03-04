@@ -1,52 +1,70 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{
+    criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion,
+};
 use nybbles::Nibbles;
 use proptest::{prelude::*, strategy::ValueTree};
 use std::{hint::black_box, time::Duration};
 
 /// Benchmarks the nibble unpacking.
 pub fn nibbles_benchmark(c: &mut Criterion) {
-    let mut g = c.benchmark_group("nibbles");
+    let lengths = [16u64, 32, 256, 2048];
+
+    {
+        let mut g = group(c, "unpack");
+        for len in lengths {
+            g.throughput(criterion::Throughput::Bytes(len));
+
+            let id = criterion::BenchmarkId::new("naive", len);
+            g.bench_function(id, |b| {
+                let bytes = &get_bytes(len as usize)[..];
+                b.iter(|| unpack_naive(black_box(bytes)))
+            });
+
+            let id = criterion::BenchmarkId::new("nybbles", len);
+            g.bench_function(id, |b| {
+                let bytes = &get_bytes(len as usize)[..];
+                b.iter(|| Nibbles::unpack(black_box(bytes)))
+            });
+        }
+    }
+
+    {
+        let mut g = group(c, "pack");
+        for len in lengths {
+            g.throughput(criterion::Throughput::Bytes(len));
+
+            let id = criterion::BenchmarkId::new("naive", len);
+            g.bench_function(id, |b| {
+                let bytes = &get_nibbles(len as usize)[..];
+                b.iter(|| pack_naive(black_box(bytes)))
+            });
+
+            let id = criterion::BenchmarkId::new("nybbles", len);
+            g.bench_function(id, |b| {
+                let bytes = &get_nibbles(len as usize);
+                b.iter(|| black_box(&bytes).pack())
+            });
+        }
+    }
+
+    {
+        let mut g = group(c, "encode_path_leaf");
+        for len in lengths {
+            g.throughput(criterion::Throughput::Bytes(len));
+            let id = criterion::BenchmarkId::new("nybbles", len);
+            g.bench_function(id, |b| {
+                let nibbles = get_nibbles(len as usize);
+                b.iter(|| black_box(&nibbles).encode_path_leaf(false))
+            });
+        }
+    }
+}
+
+fn group<'c>(c: &'c mut Criterion, name: &str) -> BenchmarkGroup<'c, WallTime> {
+    let mut g = c.benchmark_group(name);
     g.warm_up_time(Duration::from_secs(1));
     g.noise_threshold(0.02);
-
-    g.bench_function("unpack/32", |b| {
-        let bytes = get_bytes(32);
-        b.iter(|| Nibbles::unpack(black_box(&bytes[..])))
-    });
-    g.bench_function("unpack/256", |b| {
-        let bytes = get_bytes(256);
-        b.iter(|| Nibbles::unpack(black_box(&bytes[..])))
-    });
-    g.bench_function("unpack/2048", |b| {
-        let bytes = get_bytes(2048);
-        b.iter(|| Nibbles::unpack(black_box(&bytes[..])))
-    });
-
-    g.bench_function("pack/32", |b| {
-        let nibbles = get_nibbles(32);
-        b.iter(|| black_box(&nibbles).pack())
-    });
-    g.bench_function("pack/256", |b| {
-        let nibbles = get_nibbles(256);
-        b.iter(|| black_box(&nibbles).pack())
-    });
-    g.bench_function("pack/2048", |b| {
-        let nibbles = get_nibbles(2048);
-        b.iter(|| black_box(&nibbles).pack())
-    });
-
-    g.bench_function("encode_path_leaf/31", |b| {
-        let nibbles = get_nibbles(31);
-        b.iter(|| black_box(&nibbles).encode_path_leaf(false))
-    });
-    g.bench_function("encode_path_leaf/256", |b| {
-        let nibbles = get_nibbles(256);
-        b.iter(|| black_box(&nibbles).encode_path_leaf(false))
-    });
-    g.bench_function("encode_path_leaf/2048", |b| {
-        let nibbles = get_nibbles(2048);
-        b.iter(|| black_box(&nibbles).encode_path_leaf(false))
-    });
+    g
 }
 
 fn get_nibbles(len: usize) -> Nibbles {
@@ -63,5 +81,25 @@ fn get_bytes(len: usize) -> Vec<u8> {
         .current()
 }
 
+fn unpack_naive(bytes: &[u8]) -> Vec<u8> {
+    bytes.iter().flat_map(|byte| [byte >> 4, byte & 0x0f]).collect()
+}
+
+fn pack_naive(bytes: &[u8]) -> Vec<u8> {
+    let chunks = bytes.chunks_exact(2);
+    let rem = chunks.remainder();
+    chunks.map(|chunk| (chunk[0] << 4) | chunk[1]).chain(rem.iter().copied()).collect()
+}
+
 criterion_group!(benches, nibbles_benchmark);
 criterion_main!(benches);
+
+#[test]
+fn naive_equivalency() {
+    for len in [0, 1, 2, 3, 4, 15, 16, 17, 31, 32, 33] {
+        let bytes = get_bytes(len);
+        let nibbles = Nibbles::unpack(&bytes);
+        assert_eq!(unpack_naive(&bytes)[..], nibbles[..]);
+        assert_eq!(pack_naive(&nibbles[..])[..], nibbles.pack()[..]);
+    }
+}
