@@ -46,18 +46,6 @@ pub fn nibbles_benchmark(c: &mut Criterion) {
             });
         }
     }
-
-    {
-        let mut g = group(c, "encode_path_leaf");
-        for len in lengths {
-            g.throughput(criterion::Throughput::Bytes(len));
-            let id = criterion::BenchmarkId::new("nybbles", len);
-            g.bench_function(id, |b| {
-                let nibbles = get_nibbles(len as usize);
-                b.iter(|| black_box(&nibbles).encode_path_leaf(false))
-            });
-        }
-    }
 }
 
 fn group<'c>(c: &'c mut Criterion, name: &str) -> BenchmarkGroup<'c, WallTime> {

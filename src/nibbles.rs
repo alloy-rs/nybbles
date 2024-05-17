@@ -544,87 +544,6 @@ impl Nibbles {
         (hi << 4) | lo
     }
 
-    /// Encodes a given path leaf as a compact array of bytes, where each byte represents two
-    /// "nibbles" (half-bytes or 4 bits) of the original hex data, along with additional information
-    /// about the leaf itself.
-    ///
-    /// The method takes the following input:
-    /// `is_leaf`: A boolean value indicating whether the current node is a leaf node or not.
-    ///
-    /// The first byte of the encoded vector is set based on the `is_leaf` flag and the parity of
-    /// the hex data length (even or odd number of nibbles).
-    ///  - If the node is an extension with even length, the header byte is `0x00`.
-    ///  - If the node is an extension with odd length, the header byte is `0x10 + <first nibble>`.
-    ///  - If the node is a leaf with even length, the header byte is `0x20`.
-    ///  - If the node is a leaf with odd length, the header byte is `0x30 + <first nibble>`.
-    ///
-    /// If there is an odd number of nibbles, store the first nibble in the lower 4 bits of the
-    /// first byte of encoded.
-    ///
-    /// # Returns
-    ///
-    /// A vector containing the compact byte representation of the nibble sequence, including the
-    /// header byte.
-    ///
-    /// This vector's length is `self.len() / 2 + 1`. For stack-allocated nibbles, this is at most
-    /// 33 bytes, so 36 was chosen as the stack capacity to round up to the next usize-aligned
-    /// size.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use nybbles::Nibbles;
-    /// // Extension node with an even path length:
-    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
-    /// assert_eq!(nibbles.encode_path_leaf(false)[..], [0x00, 0xAB, 0xCD]);
-    ///
-    /// // Extension node with an odd path length:
-    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C]);
-    /// assert_eq!(nibbles.encode_path_leaf(false)[..], [0x1A, 0xBC]);
-    ///
-    /// // Leaf node with an even path length:
-    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
-    /// assert_eq!(nibbles.encode_path_leaf(true)[..], [0x20, 0xAB, 0xCD]);
-    ///
-    /// // Leaf node with an odd path length:
-    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C]);
-    /// assert_eq!(nibbles.encode_path_leaf(true)[..], [0x3A, 0xBC]);
-    /// ```
-    #[inline]
-    pub fn encode_path_leaf(&self, is_leaf: bool) -> SmallVec<[u8; 36]> {
-        let encoded_len = self.len() / 2 + 1;
-        let mut encoded = SmallVec::with_capacity(encoded_len);
-        // SAFETY: enough capacity.
-        unsafe { self.encode_path_leaf_to(is_leaf, encoded.as_mut_ptr()) };
-        // SAFETY: within capacity and `encode_path_leaf_to` initialized the memory.
-        unsafe { encoded.set_len(encoded_len) };
-        encoded
-    }
-
-    /// # Safety
-    ///
-    /// `ptr` must be valid for at least `self.len() / 2 + 1` bytes.
-    #[inline]
-    unsafe fn encode_path_leaf_to(&self, is_leaf: bool, ptr: *mut u8) {
-        let odd_nibbles = self.len() % 2 != 0;
-        *ptr = self.encode_path_leaf_first_byte(is_leaf, odd_nibbles);
-        let mut nibble_idx = if odd_nibbles { 1 } else { 0 };
-        for i in 0..self.len() / 2 {
-            ptr.add(i + 1).write(self.get_byte_unchecked(nibble_idx));
-            nibble_idx += 2;
-        }
-    }
-
-    #[inline]
-    fn encode_path_leaf_first_byte(&self, is_leaf: bool, odd_nibbles: bool) -> u8 {
-        match (is_leaf, odd_nibbles) {
-            (true, true) => 0x30 | self[0],
-            (true, false) => 0x20,
-            (false, true) => 0x10 | self[0],
-            (false, false) => 0x00,
-        }
-    }
-
     /// Increments the nibble sequence by one.
     #[inline]
     pub fn increment(&self) -> Option<Self> {
@@ -828,14 +747,6 @@ mod tests {
     use hex_literal::hex;
 
     #[test]
-    fn hashed_regression() {
-        let nibbles = Nibbles::from_nibbles(hex!("05010406040a040203030f010805020b050c04070003070e0909070f010b0a0805020301070c0a0902040b0f000f0006040a04050f020b090701000a0a040b"));
-        let path = nibbles.encode_path_leaf(true);
-        let expected = hex!("351464a4233f1852b5c47037e997f1ba852317ca924bf0f064a45f2b9710aa4b");
-        assert_eq!(path[..], expected);
-    }
-
-    #[test]
     fn pack_nibbles() {
         let tests = [
             (&[][..], &[][..]),
@@ -924,33 +835,6 @@ mod tests {
                 prop_assert!(nibbles.iter().all(|&nibble| nibble <= 0xf));
                 let packed = nibbles.pack();
                 prop_assert_eq!(&packed[..], input);
-            }
-
-            #[test]
-            fn encode_path_first_byte(input in vec(any::<u8>(), 1..64)) {
-                prop_assume!(!input.is_empty());
-                let input = Nibbles::unpack(input);
-                prop_assert!(input.iter().all(|&nibble| nibble <= 0xf));
-                let input_is_odd = input.len() % 2 == 1;
-
-                let compact_leaf = input.encode_path_leaf(true);
-                let leaf_flag = compact_leaf[0];
-                // Check flag
-                assert_ne!(leaf_flag & 0x20, 0);
-                assert_eq!(input_is_odd, (leaf_flag & 0x10) != 0);
-                if input_is_odd {
-                    assert_eq!(leaf_flag & 0x0f, input.first().unwrap());
-                }
-
-
-                let compact_extension = input.encode_path_leaf(false);
-                let extension_flag = compact_extension[0];
-                // Check first byte
-                assert_eq!(extension_flag & 0x20, 0);
-                assert_eq!(input_is_odd, (extension_flag & 0x10) != 0);
-                if input_is_odd {
-                    assert_eq!(extension_flag & 0x0f, input.first().unwrap());
-                }
             }
         }
     }
