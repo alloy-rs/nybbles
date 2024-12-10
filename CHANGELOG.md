@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/alloy-rs/nybbles/releases/tag/v0.3.0) - 2024-12-10
+
+### Bug Fixes
+
+- Ci branch target ([#13](https://github.com/alloy-rs/nybbles/issues/13))
+
+### Dependencies
+
+- Remove path encoding ([#12](https://github.com/alloy-rs/nybbles/issues/12))
+
+### Features
+
+- Improve benchmarks, compare with naive implementation ([#11](https://github.com/alloy-rs/nybbles/issues/11))
+
+### Miscellaneous Tasks
+
+- Sync cliff.toml
+
+### Other
+
+- Move deny to ci ([#14](https://github.com/alloy-rs/nybbles/issues/14))
+
 ## [0.2.1](https://github.com/alloy-rs/nybbles/releases/tag/v0.2.1) - 2024-02-26
 
 ### Documentation
@@ -18,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.2.1
 - Add changelog script
 
 ## [0.2.0](https://github.com/alloy-rs/nybbles/releases/tag/v0.2.0) - 2024-02-26
