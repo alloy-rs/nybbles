@@ -190,6 +190,28 @@ impl Nibbles {
         Self(SmallVec::with_capacity(capacity))
     }
 
+    /// Creates a new [`Nibbles`] instance with the given nibbles.
+    #[inline]
+    pub fn from_repr(nibbles: Repr) -> Self {
+        check_nibbles(&nibbles);
+        Self::from_repr_unchecked(nibbles)
+    }
+
+    /// Creates a new [`Nibbles`] instance with the given nibbles.
+    ///
+    /// This will not unpack the bytes into nibbles, and will instead store the bytes as-is.
+    ///
+    /// Note that it is possible to create a [`Nibbles`] instance with invalid nibble values (i.e.
+    /// values greater than 0xf) using this method. See [the type docs](Self) for more details.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the any of the bytes is not a valid nibble (`0..=0x0f`).
+    #[inline]
+    pub const fn from_repr_unchecked(small_vec: Repr) -> Self {
+        Self(small_vec)
+    }
+
     /// Creates a new [`Nibbles`] instance by copying the given bytes.
     ///
     /// # Panics
