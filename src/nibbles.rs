@@ -777,11 +777,13 @@ pub fn common_prefix_length(a: &[u8], b: &[u8]) -> usize {
 
 /// Initializes a smallvec with the given length and a closure that initializes the buffer.
 ///
+/// Optimized version of `SmallVec::with_capacity` + `f()` + `.set_len`.
+///
 /// # Safety
 ///
 /// The closure must fully initialize the buffer with the given length.
 #[inline]
-unsafe fn smallvec_with<const N: usize>(
+pub unsafe fn smallvec_with<const N: usize>(
     len: usize,
     f: impl FnOnce(&mut [MaybeUninit<u8>]),
 ) -> SmallVec<[u8; N]> {
