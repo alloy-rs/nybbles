@@ -15,10 +15,13 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(feature = "nightly", feature(core_intrinsics), allow(internal_features))]
 
 #[macro_use]
 #[allow(unused_imports)]
 extern crate alloc;
 
 mod nibbles;
-pub use nibbles::Nibbles;
+pub use nibbles::{
+    common_prefix_length, get_byte, get_byte_unchecked, pack_to, pack_to_unchecked, Nibbles,
+};

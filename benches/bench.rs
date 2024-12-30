@@ -42,7 +42,7 @@ pub fn nibbles_benchmark(c: &mut Criterion) {
             let id = criterion::BenchmarkId::new("nybbles", len);
             g.bench_function(id, |b| {
                 let bytes = &get_nibbles(len as usize);
-                b.iter(|| black_box(&bytes).pack())
+                b.iter(|| black_box(bytes).pack())
             });
         }
     }
