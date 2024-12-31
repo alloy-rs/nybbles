@@ -933,6 +933,7 @@ mod tests {
 
         proptest::proptest! {
             #[test]
+            #[cfg_attr(miri, ignore = "no proptest")]
             fn pack_unpack_roundtrip(input in vec(any::<u8>(), 0..64)) {
                 let nibbles = Nibbles::unpack(&input);
                 prop_assert!(valid_nibbles(&nibbles));
