@@ -5,11 +5,8 @@ on:
     branches: [main]
   pull_request:
 
-permissions:
-  contents: read
-
 env:
-  RUSTFLAGS: -Dwarnings
+  CARGO_TERM_COLOR: always
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -23,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         target: [aarch64-unknown-linux-gnu, i686-unknown-linux-gnu, x86_64-unknown-linux-gnu]
-        rust: [nightly, stable, 1.66] # MSRV
+        rust: [nightly, stable, "1.66"] # MSRV
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -45,27 +42,28 @@ jobs:
       - run: cargo test
         if: matrix.rust != '1.66' # MSRV
       - run: cargo build --no-default-features
-      - run: cargo test --tests --no-default-features
+      - run: cargo test --no-default-features
         if: matrix.rust != '1.66' # MSRV
+      - run: cargo test
+        if: matrix.rust != '1.66' # MSRV
+      - run: cargo test --all-features
+        if: matrix.rust == 'nightly'
 
   miri:
-    name: Miri
+    name: miri ${{ matrix.flags }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        target: [x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu]
+        flags: ["--no-default-features", "", "--all-features"]
     env:
       MIRIFLAGS: -Zmiri-strict-provenance
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@miri
-        with:
-          target: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
-      - run: cargo miri setup --target ${{ matrix.target }}
-      - run: cargo miri test --target ${{ matrix.target }}
+      - run: cargo miri test ${{ matrix.flags }}
 
   feature-checks:
     name: feature checks
@@ -80,14 +78,17 @@ jobs:
         run: cargo hack check --feature-powerset --depth 2 --all-targets
 
   clippy:
-    name: Clippy
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --all-targets
+        with:
+          cache-on-failure: true
+      - run: cargo +stable clippy --workspace --all-targets --all-features
+        env:
+          RUSTFLAGS: -Dwarnings
 
   docs:
     name: docs
