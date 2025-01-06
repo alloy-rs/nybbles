@@ -75,7 +75,7 @@ impl Clone for Nibbles {
 impl fmt::Debug for Nibbles {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Nibbles").field(&const_hex::encode(self.as_slice())).finish()
+        write!(f, "Nibbles(0x{})", const_hex::encode(self.as_slice()))
     }
 }
 
