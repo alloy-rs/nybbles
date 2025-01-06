@@ -1,6 +1,6 @@
 [package]
 name = "nybbles"
-version = "0.3.3"
+version = "0.3.4"
 authors = ["DaniPopes <57450786+DaniPopes@users.noreply.github.com>"]
 description = "Efficient nibble-sized (4-bit) byte sequence data structure"
 edition = "2021"
