@@ -128,6 +128,17 @@ impl PartialOrd for Nibbles {
     }
 }
 
+impl Index<usize> for Nibbles {
+    type Output = u8;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        /// List of possible nibbles to return static references.
+        static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+
+        &NIBBLES[self.at(index) as usize]
+    }
+}
+
 impl From<Nibbles> for Vec<u8> {
     #[inline]
     fn from(value: Nibbles) -> Self {
