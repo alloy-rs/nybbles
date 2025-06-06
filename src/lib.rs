@@ -22,7 +22,4 @@
 extern crate alloc;
 
 mod nibbles;
-pub use nibbles::{
-    common_prefix_length, get_byte, get_byte_unchecked, pack_to, pack_to_unchecked, smallvec_with,
-    Nibbles,
-};
+pub use nibbles::Nibbles;
