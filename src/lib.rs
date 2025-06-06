@@ -22,4 +22,4 @@
 extern crate alloc;
 
 mod nibbles;
-pub use nibbles::Nibbles;
+pub use nibbles::{smallvec_with, Nibbles};
