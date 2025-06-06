@@ -135,7 +135,7 @@ impl Index<usize> for Nibbles {
         /// List of possible nibbles to return static references.
         static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
-        &NIBBLES[self.at(index) as usize]
+        &NIBBLES[self.get_unchecked(index) as usize]
     }
 }
 
@@ -144,7 +144,7 @@ impl From<Nibbles> for Vec<u8> {
     fn from(value: Nibbles) -> Self {
         let mut nibbles = Self::with_capacity(value.len());
         for i in 0..value.len() {
-            nibbles.push(value.at(i));
+            nibbles.push(value.get_unchecked(i));
         }
         nibbles
     }
@@ -552,7 +552,7 @@ impl Nibbles {
 
         let mut i = 0;
         while i < other.len() {
-            if self.at(i) != other.at(i) {
+            if self.get_unchecked(i) != other.get_unchecked(i) {
                 return false;
             }
             i += 1;
@@ -575,7 +575,7 @@ impl Nibbles {
 
         let mut i = 0;
         while i < other.len() {
-            if self.at(i) != other[i] {
+            if self.get_unchecked(i) != other[i] {
                 return false;
             }
             i += 1;
@@ -589,7 +589,7 @@ impl Nibbles {
     /// # Panics
     ///
     /// Panics if the index is out of bounds.
-    pub const fn at(&self, i: usize) -> u8 {
+    pub const fn get_unchecked(&self, i: usize) -> u8 {
         // How far from the most-significant nibble?
         let pos_from_back = self.len() - 1 - i; // 0-based from MSB
         let limb = pos_from_back / 16; // 16 nibbles per u64 limb
@@ -597,6 +597,17 @@ impl Nibbles {
 
         let word = self.nibbles.as_limbs()[limb];
         ((word >> offset) & 0xF) as u8
+    }
+
+    /// Returns the nibble at the given index.
+    pub fn get(&self, i: usize) -> Option<u8> {
+        // How far from the most-significant nibble?
+        let pos_from_back = self.len().checked_sub(1 + i)?; // 0-based from MSB
+        let limb = pos_from_back / 16; // 16 nibbles per u64 limb
+        let offset = (pos_from_back % 16) * 4; // Offset bits within that limb, so we get the one we're interested in
+
+        let word = self.nibbles.as_limbs()[limb];
+        Some(((word >> offset) & 0xF) as u8)
     }
 
     /// Sets the nibble at the given index.
@@ -635,7 +646,7 @@ impl Nibbles {
         if self.length == 0 {
             None
         } else {
-            Some(self.at(0))
+            Some(self.get_unchecked(0))
         }
     }
 
@@ -644,7 +655,7 @@ impl Nibbles {
         if self.length == 0 {
             None
         } else {
-            Some(self.at(self.length as usize - 1))
+            Some(self.get_unchecked(self.length as usize - 1))
         }
     }
 
@@ -662,7 +673,7 @@ impl Nibbles {
         let min_len = if self.len() < other.len() { self.len() } else { other.len() };
         let mut i = 0;
         while i < min_len {
-            if self.at(i) != other.at(i) {
+            if self.get_unchecked(i) != other.get_unchecked(i) {
                 return i;
             }
             i += 1;
@@ -879,7 +890,7 @@ impl Nibbles {
         if self.length == 0 {
             return None;
         }
-        let nibble = self.at(self.length as usize - 1);
+        let nibble = self.get_unchecked(self.length as usize - 1);
         self.nibbles = self.nibbles.wrapping_shr(4);
         self.length -= 1;
         Some(nibble)
@@ -966,8 +977,8 @@ pub unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) 
     let ptr = out.as_mut_ptr().cast::<u8>();
     let mut i = 0;
     while i < len {
-        let hi = nibbles.at(i) << 4;
-        let lo = if i + 1 < len { nibbles.at(i + 1) } else { 0 };
+        let hi = nibbles.get_unchecked(i) << 4;
+        let lo = if i + 1 < len { nibbles.get_unchecked(i + 1) } else { 0 };
         ptr.add(i / 2).write(hi | lo);
         i += 2;
     }
@@ -1057,7 +1068,7 @@ mod tests {
             let raw = (0..16).cycle().take(len).collect::<Vec<u8>>();
             let nibbles = Nibbles::from_nibbles(&raw);
             for i in 0..len {
-                assert_eq!(nibbles.at(i), raw[i]);
+                assert_eq!(nibbles.get_unchecked(i), raw[i]);
             }
         }
     }
@@ -1066,7 +1077,7 @@ mod tests {
     fn push_pop() {
         let mut nibbles = Nibbles::new();
         nibbles.push(0x0A);
-        assert_eq!(nibbles.at(0), 0x0A);
+        assert_eq!(nibbles.get_unchecked(0), 0x0A);
         assert_eq!(nibbles.len(), 1);
 
         assert_eq!(nibbles.pop(), Some(0x0A));
