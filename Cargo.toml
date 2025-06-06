@@ -18,7 +18,7 @@ smallvec = { version = "1.0", default-features = false, features = [
     "union",
 ] }
 const-hex = { version = "1.10", default-features = false, features = ["alloc"] }
-ruint = "1.15"
+ruint = "1"
 
 # serde
 serde = { version = "1.0", default-features = false, optional = true, features = [
