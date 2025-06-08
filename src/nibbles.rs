@@ -375,6 +375,7 @@ impl Nibbles {
     }
 
     /// Returns the length of RLP encoded fields.
+    #[cfg(feature = "rlp")]
     #[inline]
     const fn rlp_payload_length(&self) -> usize {
         1 + self.nibbles.as_le_slice().len()

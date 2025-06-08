@@ -35,7 +35,7 @@ pub fn nibbles_benchmark(c: &mut Criterion) {
 
             let id = criterion::BenchmarkId::new("naive", len);
             g.bench_function(id, |b| {
-                let bytes = &get_nibbles(len as usize)[..];
+                let bytes = &get_nibbles(len as usize).to_vec();
                 b.iter(|| pack_naive(black_box(bytes)))
             });
 
@@ -87,7 +87,7 @@ fn naive_equivalency() {
     for len in [0, 1, 2, 3, 4, 15, 16, 17, 31, 32, 33] {
         let bytes = get_bytes(len);
         let nibbles = Nibbles::unpack(&bytes);
-        assert_eq!(unpack_naive(&bytes)[..], nibbles[..]);
-        assert_eq!(pack_naive(&nibbles[..])[..], nibbles.pack()[..]);
+        assert_eq!(unpack_naive(&bytes), nibbles.to_vec());
+        assert_eq!(pack_naive(&nibbles.to_vec())[..], nibbles.pack()[..]);
     }
 }
