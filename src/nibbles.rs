@@ -358,7 +358,7 @@ impl Nibbles {
     #[inline]
     pub fn pack(&self) -> SmallVec<[u8; 32]> {
         let packed_len = (self.len() + 1) / 2;
-        unsafe { smallvec_with(packed_len, |out| self.pack_to_unchecked2(out)) }
+        unsafe { smallvec_with(packed_len, |out| self.pack_to_unchecked(out)) }
     }
 
     /// Packs the nibbles into the given slice.
@@ -408,19 +408,8 @@ impl Nibbles {
     /// assert_eq!(packed[..], [0xAB, 0xCD]);
     /// ```
     #[inline]
-    #[deprecated = "prefer using `pack_to` or `pack_to_unchecked2` instead"]
-    pub unsafe fn pack_to_unchecked(&self, ptr: *mut u8) {
-        self.pack_to_unchecked2(slice::from_raw_parts_mut(ptr.cast(), (self.len() + 1) / 2));
-    }
-
-    /// Packs the nibbles into the given slice without checking its length.
-    ///
-    /// # Safety
-    ///
-    /// `out` must be valid for at least `(self.len() + 1) / 2` bytes.
-    #[inline]
-    pub unsafe fn pack_to_unchecked2(&self, out: &mut [MaybeUninit<u8>]) {
-        pack_to_unchecked(self, out);
+    pub unsafe fn pack_to_unchecked(&self, out: &mut [MaybeUninit<u8>]) {
+        pack_to_unchecked(self, out)
     }
 
     /// Converts the nibbles into a vector of nibbles.
