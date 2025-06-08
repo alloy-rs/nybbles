@@ -7,7 +7,7 @@ use std::{hint::black_box, time::Duration};
 
 /// Benchmarks the nibble unpacking.
 pub fn nibbles_benchmark(c: &mut Criterion) {
-    let lengths = [16u64, 32, 256, 2048];
+    let lengths = [8u64, 16, 32];
 
     {
         let mut g = group(c, "unpack");

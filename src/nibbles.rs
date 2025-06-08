@@ -327,51 +327,11 @@ impl Nibbles {
     /// ```
     #[inline]
     pub fn unpack<T: AsRef<[u8]>>(data: T) -> Self {
-        let bytes = data.as_ref();
-        let mut packed = Self::default();
-
-        // Convert each byte to two nibbles
-        for &byte in bytes {
-            let high_nibble = byte >> 4;
-            let low_nibble = byte & 0x0F;
-
-            // TODO: optimize
-            // Pack high nibble
-            packed.nibbles = (packed.nibbles << 4) | U256::from(high_nibble);
-            packed.length += 1;
-
-            // Pack low nibble
-            packed.nibbles = (packed.nibbles << 4) | U256::from(low_nibble);
-            packed.length += 1;
-        }
-
-        packed
-    }
-
-    /// Unpacks into the given slice rather than allocating a new [`Nibbles`] instance.
-    #[inline]
-    pub fn unpack_to(data: &[u8], out: &mut [u8]) {
-        assert!(out.len() >= data.len() * 2);
-        // SAFETY: asserted length.
-        unsafe {
-            let out = slice::from_raw_parts_mut(out.as_mut_ptr().cast(), out.len());
-            Self::unpack_to_unchecked(data, out)
-        }
-    }
-
-    /// Unpacks into the given slice rather than allocating a new [`Nibbles`] instance.
-    ///
-    /// # Safety
-    ///
-    /// `out` must be valid for at least `data.len() * 2` bytes.
-    #[inline]
-    pub unsafe fn unpack_to_unchecked(data: &[u8], out: &mut [MaybeUninit<u8>]) {
-        debug_assert!(out.len() >= data.len() * 2);
-        let ptr = out.as_mut_ptr().cast::<u8>();
-        for (i, &byte) in data.iter().enumerate() {
-            ptr.add(i * 2).write(byte >> 4);
-            ptr.add(i * 2 + 1).write(byte & 0x0f);
-        }
+        let data = data.as_ref();
+        let length =
+            data.len().checked_mul(2).expect("trying to unpack usize::MAX / 2 bytes") as u8;
+        let nibbles = U256::from_le_slice(data);
+        Self { length, nibbles }
     }
 
     /// Returns the length of RLP encoded fields.
@@ -999,7 +959,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pack_nibbles() {
+    fn pack() {
         let tests = [
             (&[][..], &[][..]),
             (&[0xa], &[0xa0]),
