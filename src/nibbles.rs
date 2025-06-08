@@ -64,7 +64,7 @@ const SLICE_MASKS: [U256; 65] = {
 /// let bytes = [0xAB, 0xCD];
 /// let nibbles = Nibbles::unpack(&bytes);
 /// assert_eq!(nibbles, Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]));
-/// assert_eq!(nibbles[..], [0x0A, 0x0B, 0x0C, 0x0D]);
+/// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
 ///
 /// let packed = nibbles.pack();
 /// assert_eq!(&packed[..], &bytes[..]);
@@ -139,12 +139,13 @@ impl Index<usize> for Nibbles {
     }
 }
 
-impl From<Nibbles> for Vec<u8> {
-    #[inline]
-    fn from(value: Nibbles) -> Self {
-        let mut nibbles = Self::with_capacity(value.len());
-        for i in 0..value.len() {
-            nibbles.push(value.get_unchecked(i));
+impl FromIterator<u8> for Nibbles {
+    fn from_iter<T: IntoIterator<Item = u8>>(iter: T) -> Self {
+        let mut nibbles = Self::default();
+        for n in iter {
+            assert!(n <= 0x0f, "invalid nibble {n:#x}");
+            nibbles.nibbles = (nibbles.nibbles << 4) | U256::from(n);
+            nibbles.length += 1;
         }
         nibbles
     }
@@ -153,13 +154,16 @@ impl From<Nibbles> for Vec<u8> {
 #[cfg(feature = "rlp")]
 impl alloy_rlp::Encodable for Nibbles {
     #[inline]
-    fn length(&self) -> usize {
-        alloy_rlp::Encodable::length(self.as_slice())
+    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
+        alloy_rlp::Header { list: true, payload_length: self.rlp_payload_length() }.encode(out);
+        out.put_u8(self.length);
+        out.put_slice(self.nibbles.as_le_slice());
     }
 
     #[inline]
-    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
-        alloy_rlp::Encodable::encode(self.as_slice(), out)
+    fn length(&self) -> usize {
+        let payload_length = self.rlp_payload_length();
+        payload_length + alloy_rlp::length_of_length(payload_length)
     }
 }
 
@@ -193,31 +197,14 @@ impl Nibbles {
         Self { length: 0, nibbles: U256::ZERO }
     }
 
-    /// Build from *any* iterator of nibble values – slices, `Vec`, ranges…
-    #[inline]
-    #[track_caller]
-    pub fn from_iter<I>(iter: I) -> Self
-    where
-        I: IntoIterator<Item = u8>,
-    {
-        let mut packed = Self::default();
-        for n in iter {
-            assert!(n <= 0x0f, "invalid nibble {n:#x}");
-            packed.nibbles = (packed.nibbles << 4) | U256::from(n);
-            packed.length += 1;
-        }
-        packed
-    }
-
-    /// Same as `from_iter`, but skips the validity check.
-    #[inline]
+    /// Same as [`FromIteartor`] implementation, but skips the validity check.
     pub fn from_iter_unchecked<I>(iter: I) -> Self
     where
         I: IntoIterator<Item = u8>,
     {
         let mut packed = Self::default();
         for n in iter {
-            packed.nibbles = (packed.nibbles << 4) | U256::from(n & 0x0f);
+            packed.nibbles = (packed.nibbles << 4) | U256::from(n);
             packed.length += 1;
         }
         packed
@@ -234,7 +221,7 @@ impl Nibbles {
     /// ```
     /// # use nybbles::Nibbles;
     /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
-    /// assert_eq!(nibbles[..], [0x0A, 0x0B, 0x0C, 0x0D]);
+    /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     /// ```
     ///
     /// Invalid values will cause panics:
@@ -264,11 +251,11 @@ impl Nibbles {
     /// ```
     /// # use nybbles::Nibbles;
     /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C, 0x0D]);
-    /// assert_eq!(nibbles[..], [0x0A, 0x0B, 0x0C, 0x0D]);
+    /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     ///
     /// // Invalid value!
     /// let nibbles = Nibbles::from_nibbles_unchecked(&[0xFF]);
-    /// assert_eq!(nibbles[..], [0xFF]);
+    /// assert_eq!(nibbles.to_vec(), vec![0x0F]);
     /// ```
     #[inline]
     pub fn from_nibbles_unchecked<T: AsRef<[u8]>>(nibbles: T) -> Self {
@@ -287,7 +274,7 @@ impl Nibbles {
     /// ```
     /// # use nybbles::Nibbles;
     /// let nibbles = Nibbles::from_vec_unchecked(vec![0x0A, 0x0B, 0x0C, 0x0D]);
-    /// assert_eq!(nibbles[..], [0x0A, 0x0B, 0x0C, 0x0D]);
+    /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     /// ```
     ///
     /// Invalid values will cause panics:
@@ -313,11 +300,11 @@ impl Nibbles {
     /// ```
     /// # use nybbles::Nibbles;
     /// let nibbles = Nibbles::from_vec_unchecked(vec![0x0A, 0x0B, 0x0C, 0x0D]);
-    /// assert_eq!(nibbles[..], [0x0A, 0x0B, 0x0C, 0x0D]);
+    /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     ///
     /// // Invalid value!
     /// let nibbles = Nibbles::from_vec_unchecked(vec![0xFF]);
-    /// assert_eq!(nibbles[..], [0xFF]);
+    /// assert_eq!(nibbles.to_vec(), vec![0x0F]);
     /// ```
     #[inline]
     pub fn from_vec_unchecked(vec: Vec<u8>) -> Self {
@@ -336,7 +323,7 @@ impl Nibbles {
     /// ```
     /// # use nybbles::Nibbles;
     /// let nibbles = Nibbles::unpack(&[0xAB, 0xCD]);
-    /// assert_eq!(nibbles[..], [0x0A, 0x0B, 0x0C, 0x0D]);
+    /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     /// ```
     #[inline]
     pub fn unpack<T: AsRef<[u8]>>(data: T) -> Self {
@@ -387,6 +374,12 @@ impl Nibbles {
         }
     }
 
+    /// Returns the length of RLP encoded fields.
+    #[inline]
+    const fn rlp_payload_length(&self) -> usize {
+        1 + self.nibbles.as_le_slice().len()
+    }
+
     /// Packs the nibbles into the given slice.
     ///
     /// This method combines each pair of consecutive nibbles into a single byte,
@@ -427,7 +420,12 @@ impl Nibbles {
     #[inline]
     #[track_caller]
     pub fn pack_to(&self, out: &mut [u8]) {
-        pack_to(self, out);
+        assert!(out.len() >= (self.len() + 1) / 2);
+        // SAFETY: asserted length.
+        unsafe {
+            let out = slice::from_raw_parts_mut(out.as_mut_ptr().cast(), out.len());
+            pack_to_unchecked(self, out)
+        }
     }
 
     /// Packs the nibbles into the given pointer.
@@ -462,6 +460,15 @@ impl Nibbles {
     #[inline]
     pub unsafe fn pack_to_unchecked2(&self, out: &mut [MaybeUninit<u8>]) {
         pack_to_unchecked(self, out);
+    }
+
+    /// Converts the nibbles into a vector of nibbles.
+    pub fn to_vec(&self) -> Vec<u8> {
+        let mut nibbles = Vec::with_capacity(self.len());
+        for i in 0..self.len() {
+            nibbles.push(self.get_unchecked(i));
+        }
+        nibbles
     }
 
     /// Gets the byte at the given index by combining two consecutive nibbles.
@@ -523,7 +530,7 @@ impl Nibbles {
     /// Increments the nibble sequence by one.
     #[inline]
     pub fn increment(&self) -> Option<Self> {
-        let mut incremented = self.clone();
+        let mut incremented = *self;
         incremented.nibbles.checked_add(U256::ONE)?;
         if self.nibbles.leading_zeros() / 4 != incremented.nibbles.leading_zeros() / 4 {
             incremented.length += 1;
@@ -642,7 +649,7 @@ impl Nibbles {
     }
 
     /// Returns the first nibble of this nibble sequence.
-    pub fn first(&self) -> Option<u8> {
+    pub const fn first(&self) -> Option<u8> {
         if self.length == 0 {
             None
         } else {
@@ -651,7 +658,7 @@ impl Nibbles {
     }
 
     /// Returns the last nibble of this nibble sequence.
-    pub fn last(&self) -> Option<u8> {
+    pub const fn last(&self) -> Option<u8> {
         if self.length == 0 {
             None
         } else {
@@ -666,10 +673,10 @@ impl Nibbles {
     /// ```
     /// # use nybbles::Nibbles;
     /// let a = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F]);
-    /// let b = &[0x0A, 0x0B, 0x0C, 0x0E];
-    /// assert_eq!(a.common_prefix_length(b), 3);
+    /// let b = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0E]);
+    /// assert_eq!(a.common_prefix_length(&b), 3);
     /// ```
-    pub fn common_prefix_length(&self, other: &Self) -> usize {
+    pub const fn common_prefix_length(&self, other: &Self) -> usize {
         let min_len = if self.len() < other.len() { self.len() } else { other.len() };
         let mut i = 0;
         while i < min_len {
@@ -763,8 +770,8 @@ impl Nibbles {
 
     /// Returns a reference to the underlying byte slice.
     #[inline]
-    pub fn as_slice(&self) -> &[u8] {
-        &self.nibbles.as_le_slice()
+    pub const fn as_slice(&self) -> &[u8] {
+        self.nibbles.as_le_slice()
     }
 
     /// Returns a mutable reference to the underlying byte slice.
@@ -772,8 +779,10 @@ impl Nibbles {
     /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
     /// [the type docs](Self) for more details.
     #[inline]
-    pub unsafe fn as_mut_slice_unchecked(&mut self) -> &mut [u8] {
-        self.nibbles.as_le_slice_mut()
+    pub fn as_mut_slice_unchecked(&mut self) -> &mut [u8] {
+        // Safety: `U256::BITS` evenly divides by 8, so this is always safe. See safety comment for
+        // `U256::as_le_slice_mut`.
+        unsafe { self.nibbles.as_le_slice_mut() }
     }
 
     /// Returns a mutable reference to the underlying [`Repr`].
@@ -846,10 +855,10 @@ impl Nibbles {
         self.slice_unchecked(start, end)
     }
 
-    /// Join two nibbles together.
+    /// Join two nibble sequences together.
     #[inline]
-    pub fn join(&self, other: &Self) -> Self {
-        let mut new = self.clone();
+    pub const fn join(&self, other: &Self) -> Self {
+        let mut new = *self;
         if other.is_empty() {
             return new;
         }
@@ -938,40 +947,13 @@ impl Nibbles {
     }
 }
 
-/// Packs the nibbles into the given slice.
-///
-/// See [`Nibbles::pack`] for more information.
-///
-/// # Panics
-///
-/// Panics if the slice is not at least `(self.len() + 1) / 2` bytes long.
-///
-/// # Examples
-///
-/// ```
-/// # use nybbles::Nibbles;
-/// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
-/// let mut packed = [0; 2];
-/// nibbles.pack_to(&mut packed);
-/// assert_eq!(packed[..], [0xAB, 0xCD]);
-/// ```
-#[inline]
-pub fn pack_to(nibbles: &Nibbles, out: &mut [u8]) {
-    assert!(out.len() >= (nibbles.len() + 1) / 2);
-    // SAFETY: asserted length.
-    unsafe {
-        let out = slice::from_raw_parts_mut(out.as_mut_ptr().cast(), out.len());
-        pack_to_unchecked(nibbles, out)
-    }
-}
-
 /// Packs the nibbles into the given slice without checking its length.
 ///
 /// # Safety
 ///
 /// `out` must be valid for at least `(self.len() + 1) / 2` bytes.
 #[inline]
-pub unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
+unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
     let len = nibbles.len();
     debug_assert!(out.len() >= (len + 1) / 2);
     let ptr = out.as_mut_ptr().cast::<u8>();
@@ -1034,7 +1016,6 @@ const fn panic_invalid_nibbles() -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hex_literal::hex;
 
     #[test]
     fn pack_nibbles() {
@@ -1063,7 +1044,7 @@ mod tests {
     }
 
     #[test]
-    fn at() {
+    fn get_unchecked() {
         for len in 0..64 {
             let raw = (0..16).cycle().take(len).collect::<Vec<u8>>();
             let nibbles = Nibbles::from_nibbles(&raw);
@@ -1085,16 +1066,30 @@ mod tests {
     }
 
     #[test]
-    fn get_byte_max() {
+    fn get_byte() {
         let nibbles = Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]);
+        assert_eq!(nibbles.get_byte(0), Some(0xAB));
+        assert_eq!(nibbles.get_byte(1), Some(0xBC));
+        assert_eq!(nibbles.get_byte(2), Some(0xCD));
+        assert_eq!(nibbles.get_byte(3), None);
         assert_eq!(nibbles.get_byte(usize::MAX), None);
+    }
+
+    #[test]
+    fn get_byte_unchecked() {
+        let nibbles = Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]);
+        unsafe {
+            assert_eq!(nibbles.get_byte_unchecked(0), 0xAB);
+            assert_eq!(nibbles.get_byte_unchecked(1), 0xBC);
+            assert_eq!(nibbles.get_byte_unchecked(2), 0xCD);
+        }
     }
 
     #[test]
     fn clone() {
         let a = Nibbles::from_nibbles([1, 2, 3]);
         #[allow(clippy::redundant_clone)]
-        let b = a.clone();
+        let b = a;
         assert_eq!(a, b);
     }
 
@@ -1142,13 +1137,10 @@ mod tests {
 
         let nibbles1 = Nibbles::from_nibbles([0x0, 0x0]);
         let nibbles2 = Nibbles::from_nibbles([0x1]);
-        // Sanity check for nybbles
-        assert_eq!(Nibbles::from(nibbles1).cmp(&Nibbles::from(nibbles2)), Ordering::Less);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Less);
 
         let nibbles1 = Nibbles::from_nibbles([0x1]);
         let nibbles2 = Nibbles::from_nibbles([0x0, 0x2]);
-        println!("nibbles1: {:x}, nibbles2: {:x}", nibbles1.nibbles, nibbles2.nibbles);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Greater);
     }
 
@@ -1449,34 +1441,42 @@ mod tests {
         assert_eq!(nibbles, Nibbles::from_nibbles(test_sequence));
     }
 
-    // #[test]
-    // fn unpack() {
-    //     for (test_idx, bytes) in (0..=32).map(|i| vec![0xFF; i]).enumerate() {
-    //         let packed_nibbles = Nibbles::unpack(&bytes);
-    //         let nibbles = Nibbles::unpack(&bytes);
+    #[test]
+    fn unpack() {
+        for (test_idx, bytes) in (0..=32).map(|i| vec![0xFF; i]).enumerate() {
+            let packed_nibbles = Nibbles::unpack(&bytes);
+            let nibbles = Nibbles::unpack(&bytes);
 
-    //         assert_eq!(
-    //             packed_nibbles.len(),
-    //             nibbles.len(),
-    //             "Test case {}: Length mismatch for bytes {:?}",
-    //             test_idx,
-    //             bytes
-    //         );
-    //         assert_eq!(
-    //             packed_nibbles.len(),
-    //             bytes.len() * 2,
-    //             "Test case {}: Expected length to be 2x byte length",
-    //             test_idx
-    //         );
+            assert_eq!(
+                packed_nibbles.len(),
+                nibbles.len(),
+                "Test case {}: Length mismatch for bytes {:?}",
+                test_idx,
+                bytes
+            );
+            assert_eq!(
+                packed_nibbles.len(),
+                bytes.len() * 2,
+                "Test case {}: Expected length to be 2x byte length",
+                test_idx
+            );
 
-    //         // Compare each nibble individually
-    //         for i in 0..packed_nibbles.len() {
-    //             assert_eq!(packed_nibbles.get_nibble(i), nibbles[i],
-    //                        "Test case {}: Nibble at index {} differs for bytes {:?}:
-    // Nibbles={:?}, Nibbles={:?}",                        test_idx, i, bytes,
-    // packed_nibbles.get_nibble(i), nibbles[i]);         }
-    //     }
-    // }
+            // Compare each nibble individually
+            for i in 0..packed_nibbles.len() {
+                assert_eq!(
+                    packed_nibbles.get_unchecked(i),
+                    nibbles[i],
+                    "Test case {}: Nibble at index {} differs for bytes {:?}:
+    Nibbles={:?}, Nibbles={:?}",
+                    test_idx,
+                    i,
+                    bytes,
+                    packed_nibbles.get_unchecked(i),
+                    nibbles[i]
+                );
+            }
+        }
+    }
 
     #[cfg(feature = "arbitrary")]
     mod arbitrary {
@@ -1488,7 +1488,7 @@ mod tests {
             #[cfg_attr(miri, ignore = "no proptest")]
             fn pack_unpack_roundtrip(input in vec(any::<u8>(), 0..64)) {
                 let nibbles = Nibbles::unpack(&input);
-                prop_assert!(valid_nibbles(&nibbles));
+                prop_assert!(valid_nibbles(&nibbles.to_vec()));
                 let packed = nibbles.pack();
                 prop_assert_eq!(&packed[..], input);
             }
