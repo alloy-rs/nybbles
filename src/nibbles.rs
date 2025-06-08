@@ -483,28 +483,19 @@ impl Nibbles {
     /// assert_eq!(nibbles.get_byte(2), Some(0xCD));
     /// assert_eq!(nibbles.get_byte(3), None);
     /// ```
-    pub fn get_byte(&self, i: usize) -> Option<u8> {
-        // Abort early if out of range
-        if i >= self.byte_len() {
-            return None;
+    pub const fn get_byte(&self, i: usize) -> Option<u8> {
+        if likely((i < usize::MAX) & (i.wrapping_add(1) < self.len())) {
+            Some(self.get_byte_unchecked(i))
+        } else {
+            None
         }
-
-        // Distance (in windows) from the most-significant byte
-        let pos_from_back = self.byte_len() - 1 - i;
-
-        // 8 bytes per 64-bit limb
-        let limb = pos_from_back / 8;
-        let offset = (pos_from_back % 8) * 8;
-
-        let word = *self.nibbles.as_limbs().get(limb)?;
-        Some(((word >> offset) & 0xFF) as u8)
     }
 
     /// Gets the byte at the given index by combining two consecutive nibbles.
     ///
-    /// # Safety
+    /// # Panics
     ///
-    /// `i..i + 1` must be in range.
+    /// Panics if `i..i + 1` is out of bounds.
     ///
     /// # Examples
     ///
@@ -518,13 +509,8 @@ impl Nibbles {
     ///     assert_eq!(nibbles.get_byte_unchecked(2), 0xCD);
     /// }
     /// ```
-    pub unsafe fn get_byte_unchecked(&self, i: usize) -> u8 {
-        debug_assert!(i < self.byte_len());
-        let pos_from_back = self.byte_len() - 1 - i;
-        let limb = pos_from_back / 8;
-        let offset = (pos_from_back % 8) * 8;
-        let word = self.nibbles.as_limbs()[limb];
-        ((word >> offset) & 0xFF) as u8
+    pub const fn get_byte_unchecked(&self, i: usize) -> u8 {
+        self.get_unchecked(i) << 4 | self.get_unchecked(i + 1)
     }
 
     /// Increments the nibble sequence by one.
@@ -592,6 +578,17 @@ impl Nibbles {
     }
 
     /// Returns the nibble at the given index.
+    pub fn get(&self, i: usize) -> Option<u8> {
+        // How far from the most-significant nibble?
+        let pos_from_back = self.len().checked_sub(1)?.checked_sub(i)?; // 0-based from MSB
+        let limb = pos_from_back / 16; // 16 nibbles per u64 limb
+        let offset = (pos_from_back % 16) * 4; // Offset bits within that limb, so we get the one we're interested in
+
+        let word = self.nibbles.as_limbs()[limb];
+        Some(((word >> offset) & 0x0F) as u8)
+    }
+
+    /// Returns the nibble at the given index.
     ///
     /// # Panics
     ///
@@ -603,18 +600,7 @@ impl Nibbles {
         let offset = (pos_from_back % 16) * 4; // Offset bits within that limb, so we get the one we're interested in
 
         let word = self.nibbles.as_limbs()[limb];
-        ((word >> offset) & 0xF) as u8
-    }
-
-    /// Returns the nibble at the given index.
-    pub fn get(&self, i: usize) -> Option<u8> {
-        // How far from the most-significant nibble?
-        let pos_from_back = self.len().checked_sub(1 + i)?; // 0-based from MSB
-        let limb = pos_from_back / 16; // 16 nibbles per u64 limb
-        let offset = (pos_from_back % 16) * 4; // Offset bits within that limb, so we get the one we're interested in
-
-        let word = self.nibbles.as_limbs()[limb];
-        Some(((word >> offset) & 0xF) as u8)
+        ((word >> offset) & 0x0F) as u8
     }
 
     /// Sets the nibble at the given index.
@@ -742,12 +728,6 @@ impl Nibbles {
         // }
 
         // common_nibbles + count_equal_nibbles(self_limbs[0], other_limbs[0])
-    }
-
-    /// Returns the total number of bytes in this [`Nibbles`].
-    #[inline(always)]
-    const fn byte_len(&self) -> usize {
-        self.length as usize / 2
     }
 
     /// Returns the total number of bits in this [`Nibbles`].
