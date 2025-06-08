@@ -155,14 +155,12 @@ impl FromIterator<u8> for Nibbles {
 impl alloy_rlp::Encodable for Nibbles {
     #[inline]
     fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
-        alloy_rlp::Header { list: true, payload_length: self.rlp_payload_length() }.encode(out);
-        out.put_u8(self.length);
-        out.put_slice(self.nibbles.as_le_slice());
+        alloy_rlp::Encodable::encode(&self.to_vec(), out)
     }
 
     #[inline]
     fn length(&self) -> usize {
-        let payload_length = self.rlp_payload_length();
+        let payload_length = self.length as usize;
         payload_length + alloy_rlp::length_of_length(payload_length)
     }
 }
@@ -330,15 +328,8 @@ impl Nibbles {
         let data = data.as_ref();
         let length =
             data.len().checked_mul(2).expect("trying to unpack usize::MAX / 2 bytes") as u8;
-        let nibbles = U256::from_le_slice(data);
+        let nibbles = U256::from_be_slice(data);
         Self { length, nibbles }
-    }
-
-    /// Returns the length of RLP encoded fields.
-    #[cfg(feature = "rlp")]
-    #[inline]
-    const fn rlp_payload_length(&self) -> usize {
-        1 + self.nibbles.as_le_slice().len()
     }
 
     /// Packs the nibbles into the given slice.
@@ -496,6 +487,29 @@ impl Nibbles {
         let mut i = 0;
         while i < other.len() {
             if self.get_unchecked(i) != other.get_unchecked(i) {
+                return false;
+            }
+            i += 1;
+        }
+
+        true
+    }
+
+    /// Returns `true` if this nibble sequence ends with the given prefix.
+    pub const fn ends_with(&self, other: &Self) -> bool {
+        // If other is empty, it's a prefix of any sequence
+        if other.is_empty() {
+            return true;
+        }
+
+        // If other is longer than self, it can't be a prefix
+        if other.len() > self.len() {
+            return false;
+        }
+
+        let mut i = 0;
+        while i < other.len() {
+            if self.get_unchecked(self.len() - i - 1) != other.get_unchecked(other.len() - i - 1) {
                 return false;
             }
             i += 1;
@@ -813,8 +827,7 @@ impl Nibbles {
     }
 
     /// Extend the current nibbles with another nibbles.
-    #[inline]
-    pub fn extend_from_slice(&mut self, other: &Nibbles) {
+    pub fn extend(&mut self, other: &Nibbles) {
         if other.is_empty() {
             return;
         }
@@ -827,13 +840,12 @@ impl Nibbles {
     ///
     /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
     /// [the type docs](Self) for more details.
-    #[inline]
-    pub fn extend_from_slice_unchecked(&mut self, other: &[u8]) {
+    pub fn extend_from_slice(&mut self, other: &[u8]) {
         if other.is_empty() {
             return;
         }
 
-        self.nibbles = self.nibbles.wrapping_shl(other.len() * 8).bitor(U256::from_le_slice(other));
+        self.nibbles = self.nibbles.wrapping_shl(other.len() * 8).bitor(U256::from_be_slice(other));
         self.length += other.len() as u8;
     }
 
@@ -1393,7 +1405,7 @@ mod tests {
         proptest::proptest! {
             #[test]
             #[cfg_attr(miri, ignore = "no proptest")]
-            fn pack_unpack_roundtrip(input in vec(any::<u8>(), 0..64)) {
+            fn pack_unpack_roundtrip(input in vec(any::<u8>(), 0..32)) {
                 let nibbles = Nibbles::unpack(&input);
                 prop_assert!(valid_nibbles(&nibbles.to_vec()));
                 let packed = nibbles.pack();
