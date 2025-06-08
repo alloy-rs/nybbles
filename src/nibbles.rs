@@ -515,29 +515,6 @@ impl Nibbles {
         true
     }
 
-    /// Returns `true` if this nibble sequence starts with the given prefix.
-    pub const fn has_prefix(&self, other: &[u8]) -> bool {
-        // If other is empty, it's a prefix of any sequence
-        if other.is_empty() {
-            return true;
-        }
-
-        // If other is longer than self, it can't be a prefix
-        if other.len() > self.len() {
-            return false;
-        }
-
-        let mut i = 0;
-        while i < other.len() {
-            if self.get_unchecked(i) != other[i] {
-                return false;
-            }
-            i += 1;
-        }
-
-        true
-    }
-
     /// Returns the nibble at the given index.
     pub fn get(&self, i: usize) -> Option<u8> {
         // How far from the most-significant nibble?
