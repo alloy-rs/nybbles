@@ -458,11 +458,20 @@ impl Nibbles {
     #[inline]
     pub fn increment(&self) -> Option<Self> {
         let mut incremented = *self;
-        incremented.nibbles.checked_add(U256::ONE)?;
-        if self.nibbles.leading_zeros() / 4 != incremented.nibbles.leading_zeros() / 4 {
-            incremented.length += 1;
+
+        // TODO: optimize
+        for i in (0..incremented.len()).rev() {
+            let nibble = incremented[i];
+            debug_assert!(nibble <= 0xf);
+            if nibble < 0xf {
+                incremented.set_at_unchecked(i, nibble + 1);
+                return Some(incremented);
+            } else {
+                incremented.set_at_unchecked(i, 0);
+            }
         }
-        Some(incremented)
+
+        None
     }
 
     /// The last element of the hex vector is used to determine whether the nibble sequence
