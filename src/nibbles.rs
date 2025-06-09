@@ -1389,6 +1389,57 @@ mod tests {
         }
     }
 
+    #[test]
+    fn increment() {
+        // Test basic increment
+        assert_eq!(
+            Nibbles::from_nibbles([0x0, 0x0, 0x0]).increment().unwrap(),
+            Nibbles::from_nibbles([0x0, 0x0, 0x1])
+        );
+
+        // Test increment with carry
+        assert_eq!(
+            Nibbles::from_nibbles([0x0, 0x0, 0xF]).increment().unwrap(),
+            Nibbles::from_nibbles([0x0, 0x1, 0x0])
+        );
+
+        // Test multiple carries
+        assert_eq!(
+            Nibbles::from_nibbles([0x0, 0xF, 0xF]).increment().unwrap(),
+            Nibbles::from_nibbles([0x1, 0x0, 0x0])
+        );
+
+        // Test increment from all F's except first nibble
+        assert_eq!(
+            Nibbles::from_nibbles([0xE, 0xF, 0xF]).increment().unwrap(),
+            Nibbles::from_nibbles([0xF, 0x0, 0x0])
+        );
+
+        // Test overflow - all nibbles are 0xF
+        assert_eq!(Nibbles::from_nibbles([0xF, 0xF, 0xF]).increment(), None);
+
+        // Test empty nibbles
+        assert_eq!(Nibbles::new().increment(), None);
+
+        // Test single nibble
+        assert_eq!(Nibbles::from_nibbles([0x5]).increment().unwrap(), Nibbles::from_nibbles([0x6]));
+
+        // Test single nibble at max
+        assert_eq!(Nibbles::from_nibbles([0xF]).increment(), None);
+
+        // Test longer sequence
+        assert_eq!(
+            Nibbles::from_nibbles([0x1, 0x2, 0x3, 0x4, 0x5]).increment().unwrap(),
+            Nibbles::from_nibbles([0x1, 0x2, 0x3, 0x4, 0x6])
+        );
+
+        // Test longer sequence with carries
+        assert_eq!(
+            Nibbles::from_nibbles([0x1, 0x2, 0x3, 0xF, 0xF]).increment().unwrap(),
+            Nibbles::from_nibbles([0x1, 0x2, 0x4, 0x0, 0x0])
+        );
+    }
+
     #[cfg(feature = "arbitrary")]
     mod arbitrary {
         use super::*;
