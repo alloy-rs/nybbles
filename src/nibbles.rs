@@ -108,7 +108,10 @@ impl Ord for Nibbles {
             (self.nibbles, other.nibbles.wrapping_shr(4))
         };
 
-        shifted_self.cmp(&shifted_other)
+        match shifted_self.cmp(&shifted_other) {
+            Ordering::Equal => self.length.cmp(&other.length),
+            ord => ord,
+        }
     }
 }
 
