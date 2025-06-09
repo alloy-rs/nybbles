@@ -98,7 +98,7 @@ impl fmt::Debug for Nibbles {
 // greater than `0x02`.
 impl Ord for Nibbles {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.length % 2 == 0 && other.length % 2 == 0 {
+        if self.length % 2 == other.length % 2 {
             return self.nibbles.cmp(&other.nibbles);
         }
 
