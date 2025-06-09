@@ -1160,6 +1160,12 @@ mod tests {
             Nibbles::from_iter((0..16).cycle().take(64)).slice(1..),
             Nibbles::from_iter((0..16).cycle().take(64).skip(1))
         );
+
+        assert_eq!(
+            Nibbles::from_nibbles_unchecked([vec![0; 61], vec![1; 1], vec![0; 1]].concat())
+                .slice(..63),
+            Nibbles::from_nibbles_unchecked([vec![0; 61], vec![1; 1]].concat())
+        );
     }
 
     #[test]
