@@ -1,5 +1,5 @@
 use core::{
-    cmp::Ordering,
+    cmp::{self, Ordering},
     fmt,
     mem::MaybeUninit,
     ops::{Bound, Index, RangeBounds},
@@ -110,9 +110,25 @@ impl fmt::Debug for Nibbles {
 // integers without accounting for length. This is incorrect, because `0x1` should be considered
 // greater than `0x02`.
 impl Ord for Nibbles {
-    #[inline]
+    #[inline(always)]
     fn cmp(&self, other: &Self) -> Ordering {
-        self.nibbles.cmp(&other.nibbles)
+        let self_len = self.len() * 2;
+        let other_len = other.len() * 2;
+        let l = cmp::min(self_len, other_len);
+
+        // Slice to the loop iteration range to enable bound check
+        // elimination in the compiler
+        let lhs = &self.nibbles.as_le_slice()[U256::BYTES - l..];
+        let rhs = &other.nibbles.as_le_slice()[U256::BYTES - l..];
+
+        for i in (0..l).rev() {
+            match lhs[i].cmp(&rhs[i]) {
+                Ordering::Equal => (),
+                non_eq => return non_eq,
+            }
+        }
+
+        self_len.cmp(&other_len)
     }
 }
 
@@ -995,6 +1011,11 @@ mod tests {
         let nibbles1 = Nibbles::default();
         let nibbles2 = Nibbles::default();
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Equal);
+
+        // Test with one empty
+        let nibbles1 = Nibbles::default();
+        let nibbles2 = Nibbles::from_nibbles([0]);
+        assert_eq!(nibbles2.cmp(&nibbles1), Ordering::Greater);
 
         // Test with same nibbles
         let nibbles1 = Nibbles::unpack([0x12, 0x34]);
