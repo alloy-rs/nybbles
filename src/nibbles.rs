@@ -457,21 +457,14 @@ impl Nibbles {
     /// Increments the nibble sequence by one.
     #[inline]
     pub fn increment(&self) -> Option<Self> {
-        let mut incremented = *self;
-
-        // TODO: optimize
-        for i in (0..incremented.len()).rev() {
-            let nibble = incremented[i];
-            debug_assert!(nibble <= 0xf);
-            if nibble < 0xf {
-                incremented.set_at_unchecked(i, nibble + 1);
-                return Some(incremented);
-            } else {
-                incremented.set_at_unchecked(i, 0);
-            }
+        let mask = SLICE_MASKS[self.len()];
+        if self.nibbles == mask {
+            return None;
         }
 
-        None
+        let mut incremented = *self;
+        incremented.nibbles = (incremented.nibbles + U256::ONE) & mask;
+        Some(incremented)
     }
 
     /// The last element of the hex vector is used to determine whether the nibble sequence
