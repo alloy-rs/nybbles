@@ -840,7 +840,7 @@ impl Nibbles {
 #[inline]
 unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
     let len = nibbles.len();
-    debug_assert!(out.len() >= (len + 1) / 2);
+    debug_assert!(out.len() >= len.div_ceil(2));
     let ptr = out.as_mut_ptr().cast::<u8>();
     let mut i = 0;
     while i < len {
@@ -933,8 +933,8 @@ mod tests {
         for len in 0..64 {
             let raw = (0..16).cycle().take(len).collect::<Vec<u8>>();
             let nibbles = Nibbles::from_nibbles(&raw);
-            for i in 0..len {
-                assert_eq!(nibbles.get_unchecked(i), raw[i]);
+            for (i, raw_nibble) in raw.into_iter().enumerate() {
+                assert_eq!(nibbles.get_unchecked(i), raw_nibble);
             }
         }
     }
@@ -963,11 +963,9 @@ mod tests {
     #[test]
     fn get_byte_unchecked() {
         let nibbles = Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]);
-        unsafe {
-            assert_eq!(nibbles.get_byte_unchecked(0), 0xAB);
-            assert_eq!(nibbles.get_byte_unchecked(1), 0xBC);
-            assert_eq!(nibbles.get_byte_unchecked(2), 0xCD);
-        }
+        assert_eq!(nibbles.get_byte_unchecked(0), 0xAB);
+        assert_eq!(nibbles.get_byte_unchecked(1), 0xBC);
+        assert_eq!(nibbles.get_byte_unchecked(2), 0xCD);
     }
 
     #[test]
