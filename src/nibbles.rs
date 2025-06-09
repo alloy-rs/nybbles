@@ -98,7 +98,7 @@ impl fmt::Debug for Nibbles {
 // greater than `0x02`.
 impl Ord for Nibbles {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.length == other.length || self.length % 2 == 0 && other.length % 2 == 0 {
+        if self.length % 2 == 0 && other.length % 2 == 0 {
             return self.nibbles.cmp(&other.nibbles);
         }
 
@@ -110,15 +110,6 @@ impl Ord for Nibbles {
 
         shifted_self.cmp(&shifted_other)
     }
-}
-
-#[test]
-fn ord() {
-    let nibbles1 = Nibbles::from_iter_unchecked((0..16).cycle().take(32));
-    let nibbles2 = Nibbles::from_iter_unchecked((0..16).cycle().take(31));
-    println!("nibbles1: {:?}", nibbles1);
-    println!("nibbles2: {:?}", nibbles2);
-    let _ = nibbles1.cmp(&nibbles2);
 }
 
 impl PartialOrd for Nibbles {
