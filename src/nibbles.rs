@@ -98,28 +98,27 @@ impl fmt::Debug for Nibbles {
 // greater than `0x02`.
 impl Ord for Nibbles {
     fn cmp(&self, other: &Self) -> Ordering {
-        match self.length.cmp(&other.length) {
-            Ordering::Equal => self.nibbles.cmp(&other.nibbles),
-            Ordering::Greater => {
-                let shift = ((self.length - other.length) as usize) * 4;
-                let cmp = self.nibbles.wrapping_shr(shift).cmp(&other.nibbles);
-                if cmp == Ordering::Equal {
-                    Ordering::Greater
-                } else {
-                    cmp
-                }
-            }
-            Ordering::Less => {
-                let shift = ((other.length - self.length) as usize) * 4;
-                let cmp = self.nibbles.cmp(&other.nibbles.wrapping_shr(shift));
-                if cmp == Ordering::Equal {
-                    Ordering::Less
-                } else {
-                    cmp
-                }
-            }
+        if self.length == other.length || self.length % 2 == 0 && other.length % 2 == 0 {
+            return self.nibbles.cmp(&other.nibbles);
         }
+
+        let (shifted_self, shifted_other) = if self.length > other.length {
+            (self.nibbles.wrapping_shr(4), other.nibbles)
+        } else {
+            (self.nibbles, other.nibbles.wrapping_shr(4))
+        };
+
+        shifted_self.cmp(&shifted_other)
     }
+}
+
+#[test]
+fn ord() {
+    let nibbles1 = Nibbles::from_iter_unchecked((0..16).cycle().take(32));
+    let nibbles2 = Nibbles::from_iter_unchecked((0..16).cycle().take(31));
+    println!("nibbles1: {:?}", nibbles1);
+    println!("nibbles2: {:?}", nibbles2);
+    let _ = nibbles1.cmp(&nibbles2);
 }
 
 impl PartialOrd for Nibbles {

@@ -5,49 +5,6 @@ use nybbles::Nibbles;
 use proptest::{prelude::*, strategy::ValueTree};
 use std::{hint::black_box, time::Duration};
 
-/// Benchmarks the nibble unpacking.
-pub fn nibbles_benchmark(c: &mut Criterion) {
-    let lengths = [8u64, 16, 32];
-
-    {
-        let mut g = group(c, "unpack");
-        for len in lengths {
-            g.throughput(criterion::Throughput::Bytes(len));
-
-            let id = criterion::BenchmarkId::new("naive", len);
-            g.bench_function(id, |b| {
-                let bytes = &get_bytes(len as usize)[..];
-                b.iter(|| unpack_naive(black_box(bytes)))
-            });
-
-            let id = criterion::BenchmarkId::new("nybbles", len);
-            g.bench_function(id, |b| {
-                let bytes = &get_bytes(len as usize)[..];
-                b.iter(|| Nibbles::unpack(black_box(bytes)))
-            });
-        }
-    }
-
-    {
-        let mut g = group(c, "pack");
-        for len in lengths {
-            g.throughput(criterion::Throughput::Bytes(len));
-
-            let id = criterion::BenchmarkId::new("naive", len);
-            g.bench_function(id, |b| {
-                let bytes = &get_nibbles(len as usize).to_vec();
-                b.iter(|| pack_naive(black_box(bytes)))
-            });
-
-            let id = criterion::BenchmarkId::new("nybbles", len);
-            g.bench_function(id, |b| {
-                let bytes = &get_nibbles(len as usize);
-                b.iter(|| black_box(bytes).pack())
-            });
-        }
-    }
-}
-
 fn group<'c>(c: &'c mut Criterion, name: &str) -> BenchmarkGroup<'c, WallTime> {
     let mut g = c.benchmark_group(name);
     g.warm_up_time(Duration::from_secs(1));
@@ -79,7 +36,95 @@ fn pack_naive(bytes: &[u8]) -> Vec<u8> {
     chunks.map(|chunk| (chunk[0] << 4) | chunk[1]).chain(rem.iter().copied()).collect()
 }
 
-criterion_group!(benches, nibbles_benchmark);
+pub fn unpack(c: &mut Criterion) {
+    let lengths = [8, 16, 32];
+
+    let mut g = group(c, "unpack");
+    for len in lengths {
+        g.throughput(criterion::Throughput::Bytes(len as u64));
+
+        let id = criterion::BenchmarkId::new("naive", len);
+        g.bench_function(id, |b| {
+            let bytes = &get_bytes(len)[..];
+            b.iter(|| unpack_naive(black_box(bytes)))
+        });
+
+        let id = criterion::BenchmarkId::new("nybbles", len);
+        g.bench_function(id, |b| {
+            let bytes = &get_bytes(len)[..];
+            b.iter(|| Nibbles::unpack(black_box(bytes)))
+        });
+    }
+}
+
+pub fn pack(c: &mut Criterion) {
+    let lengths = [8, 16, 32];
+
+    let mut g = group(c, "pack");
+    for len in lengths {
+        g.throughput(criterion::Throughput::Bytes(len as u64));
+
+        let id = criterion::BenchmarkId::new("naive", len);
+        g.bench_function(id, |b| {
+            let bytes = &get_nibbles(len).to_vec();
+            b.iter(|| pack_naive(black_box(bytes)))
+        });
+
+        let id = criterion::BenchmarkId::new("nybbles", len);
+        g.bench_function(id, |b| {
+            let bytes = &get_nibbles(len);
+            b.iter(|| black_box(bytes).pack())
+        });
+    }
+}
+
+pub fn ord(c: &mut Criterion) {
+    let lengths = [8, 16, 32, 64, 128];
+
+    let mut g = group(c, "ord");
+    for len in lengths {
+        g.throughput(criterion::Throughput::Elements(1));
+
+        let id = criterion::BenchmarkId::new("cmp_equal", len);
+        g.bench_function(id, |b| {
+            let nibbles1 = get_nibbles(len);
+            let nibbles2 = nibbles1;
+            b.iter(|| black_box(&nibbles1).cmp(black_box(&nibbles2)))
+        });
+
+        let id = criterion::BenchmarkId::new("cmp_different_same_length", len);
+        g.bench_function(id, |b| {
+            let nibbles1 = get_nibbles(len);
+            let mut nibbles2 = get_nibbles(len);
+            // Ensure they're different
+            if nibbles1 == nibbles2 {
+                nibbles2.push(0);
+                nibbles2.pop();
+            }
+            b.iter(|| black_box(&nibbles1).cmp(black_box(&nibbles2)))
+        });
+
+        let id = criterion::BenchmarkId::new("cmp_different_lengths", len);
+        g.bench_function(id, |b| {
+            let nibbles1 = get_nibbles(len);
+            let nibbles2 = get_nibbles(len / 2);
+            b.iter(|| black_box(&nibbles1).cmp(black_box(&nibbles2)))
+        });
+
+        let id = criterion::BenchmarkId::new("cmp_prefix", len);
+        g.bench_function(id, |b| {
+            let mut nibbles1 = get_nibbles(len / 2);
+            let nibbles2 = nibbles1;
+            // Make nibbles1 longer with the same prefix
+            for _ in 0..len / 2 {
+                nibbles1.push(1);
+            }
+            b.iter(|| black_box(&nibbles1).cmp(black_box(&nibbles2)))
+        });
+    }
+}
+
+criterion_group!(benches, unpack, pack, ord);
 criterion_main!(benches);
 
 #[test]
