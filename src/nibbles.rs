@@ -689,23 +689,6 @@ impl Nibbles {
         self.length as usize
     }
 
-    /// Returns a reference to the underlying byte slice.
-    #[inline]
-    pub const fn as_slice(&self) -> &[u8] {
-        self.nibbles.as_le_slice()
-    }
-
-    /// Returns a mutable reference to the underlying byte slice.
-    ///
-    /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
-    /// [the type docs](Self) for more details.
-    #[inline]
-    pub fn as_mut_slice_unchecked(&mut self) -> &mut [u8] {
-        // Safety: `U256::BITS` evenly divides by 8, so this is always safe. See safety comment for
-        // `U256::as_le_slice_mut`.
-        unsafe { self.nibbles.as_le_slice_mut() }
-    }
-
     /// Returns a mutable reference to the underlying [`Repr`].
     ///
     /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
