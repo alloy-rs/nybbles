@@ -32,7 +32,7 @@ const SLICE_MASKS: [U256; 65] = {
     let mut masks = [U256::ZERO; 65];
     let mut i = 0;
     while i <= 64 {
-        masks[i] = U256::MAX.wrapping_shr(256 - i * 4);
+        masks[i] = if i == 0 { U256::ZERO } else { U256::MAX.wrapping_shl(256 - i * 4) };
         i += 1;
     }
     masks
@@ -97,28 +97,9 @@ impl fmt::Debug for Nibbles {
 // integers without accounting for length. This is incorrect, because `0x1` should be considered
 // greater than `0x02`.
 impl Ord for Nibbles {
+    #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
-        match self.length.cmp(&other.length) {
-            Ordering::Equal => self.nibbles.cmp(&other.nibbles),
-            Ordering::Greater => {
-                let shift = ((self.length - other.length) as usize) * 4;
-                let cmp = self.nibbles.wrapping_shr(shift).cmp(&other.nibbles);
-                if cmp == Ordering::Equal {
-                    Ordering::Greater
-                } else {
-                    cmp
-                }
-            }
-            Ordering::Less => {
-                let shift = ((other.length - self.length) as usize) * 4;
-                let cmp = self.nibbles.cmp(&other.nibbles.wrapping_shr(shift));
-                if cmp == Ordering::Equal {
-                    Ordering::Less
-                } else {
-                    cmp
-                }
-            }
-        }
+        self.nibbles.cmp(&other.nibbles)
     }
 }
 
@@ -143,9 +124,7 @@ impl FromIterator<u8> for Nibbles {
     fn from_iter<T: IntoIterator<Item = u8>>(iter: T) -> Self {
         let mut nibbles = Self::default();
         for n in iter {
-            assert!(n <= 0x0f, "invalid nibble {n:#x}");
-            nibbles.nibbles = (nibbles.nibbles << 4) | U256::from(n);
-            nibbles.length += 1;
+            nibbles.push(n);
         }
         nibbles
     }
@@ -202,8 +181,7 @@ impl Nibbles {
     {
         let mut packed = Self::default();
         for n in iter {
-            packed.nibbles = (packed.nibbles << 4) | U256::from(n);
-            packed.length += 1;
+            packed.push_unchecked(n);
         }
         packed
     }
@@ -328,7 +306,10 @@ impl Nibbles {
         let data = data.as_ref();
         let length =
             data.len().checked_mul(2).expect("trying to unpack usize::MAX / 2 bytes") as u8;
-        let nibbles = U256::from_be_slice(data);
+        let mut nibbles = U256::from_be_slice(data);
+        if length > 0 {
+            nibbles = nibbles.wrapping_shl((64 - length as usize) * 4);
+        }
         Self { length, nibbles }
     }
 
@@ -348,8 +329,8 @@ impl Nibbles {
     /// ```
     #[inline]
     pub fn pack(&self) -> SmallVec<[u8; 32]> {
-        let packed_len = (self.len() + 1) / 2;
-        unsafe { smallvec_with(packed_len, |out| self.pack_to_unchecked(out)) }
+        let packed_len = self.len().div_ceil(2);
+        unsafe { smallvec_with(packed_len, |out| self.pack_to_slice_unchecked(out)) }
     }
 
     /// Packs the nibbles into the given slice.
@@ -372,12 +353,9 @@ impl Nibbles {
     #[inline]
     #[track_caller]
     pub fn pack_to(&self, out: &mut [u8]) {
-        assert!(out.len() >= (self.len() + 1) / 2);
+        assert!(out.len() >= self.len().div_ceil(2));
         // SAFETY: asserted length.
-        unsafe {
-            let out = slice::from_raw_parts_mut(out.as_mut_ptr().cast(), out.len());
-            pack_to_unchecked(self, out)
-        }
+        unsafe { self.pack_to_unchecked(out.as_mut_ptr()) }
     }
 
     /// Packs the nibbles into the given pointer.
@@ -399,7 +377,13 @@ impl Nibbles {
     /// assert_eq!(packed[..], [0xAB, 0xCD]);
     /// ```
     #[inline]
-    pub unsafe fn pack_to_unchecked(&self, out: &mut [MaybeUninit<u8>]) {
+    pub unsafe fn pack_to_unchecked(&self, ptr: *mut u8) {
+        let slice = slice::from_raw_parts_mut(ptr.cast(), self.len().div_ceil(2));
+        pack_to_unchecked(self, slice);
+    }
+
+    #[inline]
+    pub unsafe fn pack_to_slice_unchecked(&self, out: &mut [MaybeUninit<u8>]) {
         pack_to_unchecked(self, out)
     }
 
@@ -463,7 +447,8 @@ impl Nibbles {
         }
 
         let mut incremented = *self;
-        incremented.nibbles = (incremented.nibbles + U256::ONE) & mask;
+        let add = U256::ONE.wrapping_shl((64 - self.len()) * 4);
+        incremented.nibbles = (incremented.nibbles + add) & mask;
         Some(incremented)
     }
 
@@ -537,10 +522,9 @@ impl Nibbles {
     ///
     /// Panics if the index is out of bounds.
     pub const fn get_unchecked(&self, i: usize) -> u8 {
-        // How far from the most-significant nibble?
-        let pos_from_back = self.len() - 1 - i; // 0-based from MSB
-        let limb = pos_from_back / 16; // 16 nibbles per u64 limb
-        let offset = (pos_from_back % 16) * 4; // Offset bits within that limb, so we get the one we're interested in
+        let pos = 63 - i; // index from the MSB side
+        let limb = pos / 16; // 16 nibbles per u64 limb
+        let offset = (pos % 16) * 4; // offset bits within that limb
 
         let word = self.nibbles.as_limbs()[limb];
         ((word >> offset) & 0x0F) as u8
@@ -567,14 +551,14 @@ impl Nibbles {
     #[track_caller]
     pub fn set_at_unchecked(&mut self, i: usize, value: u8) {
         assert!(i < self.length as usize, "index out of bounds");
-        let pos_from_back = self.len() - 1 - i; // 0-based from MSB
-        let limb = pos_from_back / 16; // 16 nibbles per u64 limb
-        let offset = (pos_from_back % 16) * 4; // Offset bits within that limb, so we get the one we're interested in
+        let pos = 63 - i; // index from MSB
+        let limb = pos / 16;
+        let offset = (pos % 16) * 4;
 
-        // SAFETY: We checked that index is within bounds, so the limb is also within bounds
+        // SAFETY: index checked above
         let word = unsafe { self.nibbles.as_limbs_mut().get_unchecked_mut(limb) };
-        *word &= !(0xF << offset); // Clear old nibble
-        *word |= (value as u64) << offset; // Set new nibble
+        *word &= !(0xF << offset);
+        *word |= (value as u64) << offset;
     }
 
     /// Returns the first nibble of this nibble sequence.
@@ -722,15 +706,8 @@ impl Nibbles {
 
         let nibble_len = end - start;
 
-        // Shift so that the first requested nibble becomes the least significant one
-        let shifted = if slice_to_end {
-            self.nibbles
-        } else {
-            let shift = (self.len() - end) * 4;
-            self.nibbles.wrapping_shr(shift)
-        };
-        // Mask out everything to the left of the slice
-        let nibbles = shifted.bitand(SLICE_MASKS[nibble_len]);
+        let mask = SLICE_MASKS[end].bitxor(SLICE_MASKS[start]);
+        let nibbles = self.nibbles.bitand(mask).wrapping_shl(start * 4);
 
         Self { length: nibble_len as u8, nibbles }
     }
@@ -769,7 +746,7 @@ impl Nibbles {
             return new;
         }
 
-        new.nibbles = new.nibbles.wrapping_shl(other.bit_len()).bitor(other.nibbles);
+        new.nibbles = new.nibbles.bitor(other.nibbles.wrapping_shr(self.bit_len()));
         new.length += other.length;
         new
     }
@@ -791,11 +768,9 @@ impl Nibbles {
     /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
     /// [the type docs](Self) for more details.
     pub fn push_unchecked(&mut self, nibble: u8) {
-        if self.length > 0 {
-            self.nibbles = self.nibbles.wrapping_shl(4);
-        }
+        let shift = (64 - self.length as usize - 1) * 4;
         if nibble > 0 {
-            self.nibbles = self.nibbles.bitor(U256::from_limbs([(nibble & 0x0F) as u64, 0, 0, 0]));
+            self.nibbles |= U256::from_limbs([(nibble & 0x0F) as u64, 0, 0, 0]).wrapping_shl(shift);
         }
         self.length += 1;
     }
@@ -805,8 +780,9 @@ impl Nibbles {
         if self.length == 0 {
             return None;
         }
-        let nibble = self.get_unchecked(self.length as usize - 1);
-        self.nibbles = self.nibbles.wrapping_shr(4);
+        let shift = (64 - self.length as usize) * 4;
+        let nibble = ((self.nibbles.wrapping_shr(shift).as_limbs()[0]) & 0xF) as u8;
+        self.nibbles &= !(U256::from(0xF_u8) << shift);
         self.length -= 1;
         Some(nibble)
     }
@@ -817,7 +793,7 @@ impl Nibbles {
             return;
         }
 
-        self.nibbles = self.nibbles.wrapping_shl(other.bit_len()).bitor(other.nibbles);
+        self.nibbles |= other.nibbles.wrapping_shr(self.bit_len());
         self.length += other.length;
     }
 
@@ -830,8 +806,13 @@ impl Nibbles {
             return;
         }
 
-        self.nibbles = self.nibbles.wrapping_shl(other.len() * 8).bitor(U256::from_be_slice(other));
-        self.length += other.len() as u8;
+        let len_bytes = other.len();
+        let mut other = U256::from_be_slice(other);
+        if len_bytes > 0 {
+            other = other.wrapping_shl((32 - len_bytes) * 8);
+        }
+        self.nibbles |= other.wrapping_shr(self.bit_len());
+        self.length += (len_bytes * 2) as u8;
     }
 
     /// Truncates the current nibbles to the given length.
