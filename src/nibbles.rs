@@ -38,6 +38,19 @@ const SLICE_MASKS: [U256; 65] = {
     masks
 };
 
+/// This array contains 65 increment masks used in [`Nibbles::increment`].
+///
+/// Each mask is a [`U256`] equal to `1 << ((64 - i) * 4)`.
+const INCREMENT_MASKS: [U256; 65] = {
+    let mut masks = [U256::ZERO; 65];
+    let mut i = 0;
+    while i <= 64 {
+        masks[i] = U256::ONE.wrapping_shl((64 - i) * 4);
+        i += 1;
+    }
+    masks
+};
+
 /// Structure representing a sequence of nibbles.
 ///
 /// A nibble is a 4-bit value, and this structure is used to store the nibble sequence representing
@@ -447,7 +460,7 @@ impl Nibbles {
         }
 
         let mut incremented = *self;
-        let add = U256::ONE.wrapping_shl((64 - self.len()) * 4);
+        let add = INCREMENT_MASKS[self.len()];
         incremented.nibbles = (incremented.nibbles + add) & mask;
         Some(incremented)
     }
