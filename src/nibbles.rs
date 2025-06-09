@@ -98,19 +98,22 @@ impl fmt::Debug for Nibbles {
 // greater than `0x02`.
 impl Ord for Nibbles {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.length % 2 == other.length % 2 {
+        if self.length == other.length && self.length % 2 == other.length % 2 {
             return self.nibbles.cmp(&other.nibbles);
         }
 
-        let (shifted_self, shifted_other) = if self.length > other.length {
-            (self.nibbles.wrapping_shr(4), other.nibbles)
+        if self.length > other.length {
+            let shifted_self = self.nibbles.wrapping_shr(4);
+            match shifted_self.cmp(&other.nibbles) {
+                Ordering::Equal => self.length.cmp(&other.length),
+                ord => ord,
+            }
         } else {
-            (self.nibbles, other.nibbles.wrapping_shr(4))
-        };
-
-        match shifted_self.cmp(&shifted_other) {
-            Ordering::Equal => self.length.cmp(&other.length),
-            ord => ord,
+            let shifted_other = other.nibbles.wrapping_shr(4);
+            match self.nibbles.cmp(&shifted_other) {
+                Ordering::Equal => self.length.cmp(&other.length),
+                ord => ord,
+            }
         }
     }
 }
