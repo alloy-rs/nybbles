@@ -112,8 +112,8 @@ impl fmt::Debug for Nibbles {
 impl Ord for Nibbles {
     #[inline(always)]
     fn cmp(&self, other: &Self) -> Ordering {
-        let self_len = self.len() * 2;
-        let other_len = other.len() * 2;
+        let self_len = self.len().div_ceil(2);
+        let other_len = other.len().div_ceil(2);
         let l = cmp::min(self_len, other_len);
 
         // Slice to the loop iteration range to enable bound check
