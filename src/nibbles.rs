@@ -644,31 +644,38 @@ impl Nibbles {
 
         let min_len = self.len().min(other.len());
 
-        // Fast path: if both have same length and it's 64, we can skip masking
+        // Fast path for small sequences that fit in one u64 limb
+        if min_len <= 16 {
+            // Extract the highest u64 limb which contains all the nibbles
+            let self_limb = self.nibbles.as_limbs()[3];
+            let other_limb = other.nibbles.as_limbs()[3];
+
+            // Create mask for the nibbles we care about
+            let mask = u64::MAX << ((16 - min_len) * 4);
+            let xor = (self_limb & mask) ^ (other_limb & mask);
+
+            if xor == 0 {
+                return min_len;
+            } else {
+                return xor.leading_zeros() as usize / 4;
+            }
+        }
+
+        // For larger sequences, use our optimized U256 approach
         let xor = if min_len == 64 && self.len() == other.len() {
             self.nibbles ^ other.nibbles
         } else {
-            // Create mask using the pre-computed SLICE_MASKS table
-            // SLICE_MASKS[i] has the highest i*4 bits set
             let mask = SLICE_MASKS[min_len];
-            
-            // Apply mask to both values and XOR to find differing bits
             let masked_self = self.nibbles & mask;
             let masked_other = other.nibbles & mask;
             masked_self ^ masked_other
         };
-        
-        // If they're identical up to min_len, return min_len
+
         if xor == U256::ZERO {
-            return min_len;
+            min_len
+        } else {
+            xor.leading_zeros() as usize / 4
         }
-
-        // Find the position of the first differing bit
-        let leading_zeros = xor.leading_zeros();
-
-        // Convert bit position to nibble position
-        // Each nibble is 4 bits, and we're counting from the MSB
-        leading_zeros as usize / 4
     }
 
     /// Returns the total number of bits in this [`Nibbles`].
