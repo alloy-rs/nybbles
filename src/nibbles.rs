@@ -101,7 +101,8 @@ impl fmt::Debug for Nibbles {
         if self.is_empty() {
             write!(f, "Nibbles(0x)")
         } else {
-            write!(f, "Nibbles(0x{:0width$x})", self.nibbles, width = self.length as usize)
+            let shifted = self.nibbles.wrapping_shr((64 - self.len()) * 4);
+            write!(f, "Nibbles(0x{:0width$x})", shifted, width = self.len())
         }
     }
 }
