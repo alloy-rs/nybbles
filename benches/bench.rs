@@ -283,9 +283,9 @@ pub fn bench_increment(c: &mut Criterion) {
     group.finish();
 }
 
-pub fn bench_naive_vs_optimized(c: &mut Criterion) {
+pub fn nibbles_benchmark(c: &mut Criterion) {
     {
-        let mut g = c.benchmark_group("unpack_comparison");
+        let mut g = c.benchmark_group("unpack");
         for size in SIZE_BYTES {
             g.throughput(criterion::Throughput::Bytes(size as u64));
 
@@ -304,7 +304,7 @@ pub fn bench_naive_vs_optimized(c: &mut Criterion) {
     }
 
     {
-        let mut g = c.benchmark_group("pack_comparison");
+        let mut g = c.benchmark_group("pack");
         for size in SIZE_NIBBLES {
             g.throughput(criterion::Throughput::Elements(size as u64));
 
@@ -353,7 +353,7 @@ criterion_group!(
     config = Criterion::default().warm_up_time(Duration::from_millis(500));
     targets = bench_from_nibbles, bench_pack, bench_unpack, bench_push, bench_slice,
               bench_join, bench_extend, bench_set_at, bench_get_byte, bench_common_prefix_length,
-              bench_cmp, bench_clone, bench_increment, bench_naive_vs_optimized
+              bench_cmp, bench_clone, bench_increment, nibbles_benchmark
 );
 criterion_main!(benches);
 
