@@ -4,7 +4,7 @@ version = "0.3.4"
 authors = ["DaniPopes <57450786+DaniPopes@users.noreply.github.com>"]
 description = "Efficient nibble-sized (4-bit) byte sequence data structure"
 edition = "2021"
-rust-version = "1.66"
+rust-version = "1.73"
 license = "MIT OR Apache-2.0"
 categories = ["data-structures", "no-std"]
 keywords = ["nibbles", "vector", "ethereum"]
@@ -37,8 +37,8 @@ proptest = { version = "1.4", default-features = false, optional = true, feature
 ] }
 
 [dev-dependencies]
-hex-literal = "0.4"
-criterion = "0.5"
+hex-literal = "1"
+criterion = { version = "2.10", package = "codspeed-criterion-compat" }
 
 [features]
 default = ["std"]
@@ -58,3 +58,10 @@ arbitrary = [
 name = "bench"
 harness = false
 required-features = ["arbitrary"]
+
+# Use the `--profile profiling` flag to show symbols in release mode.
+# e.g. `cargo build --profile profiling`
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = "none"
