@@ -625,20 +625,21 @@ impl Nibbles {
             return 0;
         }
 
-        let min_len = if self.len() < other.len() { self.len() } else { other.len() };
+        let min_len = self.len().min(other.len());
 
-        // Create masks to only consider the bits that are valid for both sequences
-        // We need to compare only the bits corresponding to min_len nibbles
-        let mask = if min_len == 64 {
-            U256::MAX
+        // Fast path: if both have same length and it's 64, we can skip masking
+        let xor = if min_len == 64 && self.len() == other.len() {
+            self.nibbles ^ other.nibbles
         } else {
-            U256::MAX << ((64 - min_len) * 4)
+            // Create mask using the pre-computed SLICE_MASKS table
+            // SLICE_MASKS[i] has the highest i*4 bits set
+            let mask = SLICE_MASKS[min_len];
+            
+            // Apply mask to both values and XOR to find differing bits
+            let masked_self = self.nibbles & mask;
+            let masked_other = other.nibbles & mask;
+            masked_self ^ masked_other
         };
-        
-        // Apply mask to both values and XOR to find differing bits
-        let masked_self = self.nibbles & mask;
-        let masked_other = other.nibbles & mask;
-        let xor = masked_self ^ masked_other;
         
         // If they're identical up to min_len, return min_len
         if xor == U256::ZERO {
@@ -650,14 +651,7 @@ impl Nibbles {
         
         // Convert bit position to nibble position
         // Each nibble is 4 bits, and we're counting from the MSB
-        let first_diff_nibble = leading_zeros as usize / 4;
-        
-        // Make sure we don't exceed min_len (should not be necessary due to masking, but for safety)
-        if first_diff_nibble >= min_len {
-            min_len
-        } else {
-            first_diff_nibble
-        }
+        leading_zeros as usize / 4
     }
 
     /// Returns the total number of bits in this [`Nibbles`].
