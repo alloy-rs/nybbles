@@ -747,7 +747,7 @@ pub unsafe fn get_byte_unchecked(nibbles: &[u8], i: usize) -> u8 {
 /// ```
 #[inline]
 pub fn pack_to(nibbles: &[u8], out: &mut [u8]) {
-    assert!(out.len() >= nibbles.len().div_ceil(2);
+    assert!(out.len() >= nibbles.len().div_ceil(2));
     // SAFETY: asserted length.
     unsafe {
         let out = slice::from_raw_parts_mut(out.as_mut_ptr().cast(), out.len());
@@ -763,7 +763,7 @@ pub fn pack_to(nibbles: &[u8], out: &mut [u8]) {
 #[inline]
 pub unsafe fn pack_to_unchecked(nibbles: &[u8], out: &mut [MaybeUninit<u8>]) {
     let len = nibbles.len();
-    debug_assert!(out.len() >= len.div_ceil(2);
+    debug_assert!(out.len() >= len.div_ceil(2));
     let ptr = out.as_mut_ptr().cast::<u8>();
     for i in 0..len / 2 {
         ptr.add(i).write(get_byte_unchecked(nibbles, i * 2));
