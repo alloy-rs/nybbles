@@ -715,9 +715,15 @@ impl Nibbles {
             // This avoids the XOR operation
             self.nibbles.bitand(SLICE_MASKS[end])
         } else {
-            // General case: XOR masks and shift
-            let mask = SLICE_MASKS[end].bitxor(SLICE_MASKS[start]);
-            self.nibbles.bitand(mask).wrapping_shl(start * 4)
+            // For middle and to_end cases, always shift first
+            let shifted = self.nibbles.wrapping_shl(start * 4);
+            if slice_to_end {
+                // When slicing to the end, no mask needed after shift
+                shifted
+            } else {
+                // For middle slices, apply end mask after shift
+                shifted.bitand(SLICE_MASKS[end - start])
+            }
         };
 
         Self { length: nibble_len as u8, nibbles }
