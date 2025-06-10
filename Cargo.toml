@@ -36,8 +36,8 @@ proptest = { version = "1.4", default-features = false, optional = true, feature
 ] }
 
 [dev-dependencies]
-hex-literal = "0.4"
-criterion = "0.5"
+hex-literal = "1"
+criterion = { version = "2.10", package = "codspeed-criterion-compat" }
 
 [features]
 default = ["std"]
@@ -51,3 +51,10 @@ arbitrary = ["dep:arbitrary", "dep:proptest", "smallvec/arbitrary", "std"]
 name = "bench"
 harness = false
 required-features = ["arbitrary"]
+
+# Use the `--profile profiling` flag to show symbols in release mode.
+# e.g. `cargo build --profile profiling`
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = "none"
