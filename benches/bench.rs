@@ -14,7 +14,7 @@ pub fn bench_from_nibbles(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(size as u64));
 
-        group.bench_with_input(BenchmarkId::new("from_nibbles", size), &nibbles_data, |b, data| {
+        group.bench_with_input(size, &nibbles_data, |b, data| {
             b.iter(|| Nibbles::from_nibbles(black_box(data)))
         });
     }
@@ -63,9 +63,7 @@ pub fn bench_unpack(c: &mut Criterion) {
 
         group.throughput(Throughput::Bytes(size as u64));
 
-        group.bench_with_input(BenchmarkId::new("unpack", size), &bytes, |b, data| {
-            b.iter(|| Nibbles::unpack(black_box(data)))
-        });
+        group.bench_with_input(size, &bytes, |b, data| b.iter(|| Nibbles::unpack(black_box(data))));
     }
 
     group.finish();
@@ -79,7 +77,7 @@ pub fn bench_push(c: &mut Criterion) {
 
         let nibbles = generate_nibbles(size);
 
-        group.bench_with_input(BenchmarkId::new("push", size), &nibbles, |b, nibbles| {
+        group.bench_with_input(size, &nibbles, |b, nibbles| {
             b.iter(|| {
                 let mut nib = Nibbles::new();
                 for nibble in nibbles {
@@ -99,7 +97,7 @@ pub fn bench_slice(c: &mut Criterion) {
     for size in SIZE_NIBBLES {
         let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
 
-        group.bench_with_input(BenchmarkId::new("slice", size), &nibbles, |b, data| {
+        group.bench_with_input(size, &nibbles, |b, data| {
             let end = data.len() / 2;
             b.iter(|| black_box(data).slice(black_box(0..end)))
         });
@@ -115,11 +113,9 @@ pub fn bench_join(c: &mut Criterion) {
         let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
         let other_nibbles = Nibbles::from_nibbles(generate_nibbles(size / 2));
 
-        group.bench_with_input(
-            BenchmarkId::new("join", size),
-            &(nibbles.clone(), other_nibbles.clone()),
-            |b, (a, b_nib)| b.iter(|| black_box(a).join(black_box(b_nib))),
-        );
+        group.bench_with_input(size, &(nibbles.clone(), other_nibbles.clone()), |b, (a, b_nib)| {
+            b.iter(|| black_box(a).join(black_box(b_nib)))
+        });
     }
 
     group.finish();
@@ -134,20 +130,16 @@ pub fn bench_extend(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(size as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new("extend", size),
-            &(nibbles.clone(), other_nibbles.clone()),
-            |b, (a, b_nib)| {
-                b.iter_batched(
-                    || a.clone(),
-                    |mut nib| {
-                        nib.extend_from_slice(black_box(b_nib));
-                        nib
-                    },
-                    criterion::BatchSize::SmallInput,
-                )
-            },
-        );
+        group.bench_with_input(size, &(nibbles.clone(), other_nibbles.clone()), |b, (a, b_nib)| {
+            b.iter_batched(
+                || a.clone(),
+                |mut nib| {
+                    nib.extend_from_slice(black_box(b_nib));
+                    nib
+                },
+                criterion::BatchSize::SmallInput,
+            )
+        });
     }
 
     group.finish();
@@ -159,7 +151,7 @@ pub fn bench_set_at(c: &mut Criterion) {
     for size in SIZE_NIBBLES {
         let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
 
-        group.bench_with_input(BenchmarkId::new("set_at", size), &nibbles, |b, data| {
+        group.bench_with_input(size, &nibbles, |b, data| {
             b.iter_batched(
                 || data.clone(),
                 |mut nib| {
@@ -224,11 +216,9 @@ pub fn bench_common_prefix_length(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(nibbles_b.len() as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new("common_prefix_length", size),
-            &(nibbles_a.clone(), nibbles_b),
-            |b, (data, other)| b.iter(|| data.common_prefix_length(black_box(other))),
-        );
+        group.bench_with_input(size, &(nibbles_a.clone(), nibbles_b), |b, (data, other)| {
+            b.iter(|| data.common_prefix_length(black_box(other)))
+        });
     }
 
     group.finish();
@@ -243,11 +233,9 @@ pub fn bench_cmp(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(size as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new("cmp", size),
-            &(nibbles_a.clone(), nibbles_b),
-            |b, (data, other)| b.iter(|| black_box(data).cmp(black_box(other))),
-        );
+        group.bench_with_input(size, &(nibbles_a.clone(), nibbles_b), |b, (data, other)| {
+            b.iter(|| black_box(data).cmp(black_box(other)))
+        });
     }
 
     group.finish();
@@ -261,9 +249,7 @@ pub fn bench_clone(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(size as u64));
 
-        group.bench_with_input(BenchmarkId::new("clone", size), &nibbles, |b, data| {
-            b.iter(|| black_box(data).clone())
-        });
+        group.bench_with_input(size, &nibbles, |b, data| b.iter(|| black_box(data).clone()));
     }
 
     group.finish();
@@ -275,9 +261,7 @@ pub fn bench_increment(c: &mut Criterion) {
     for size in SIZE_NIBBLES {
         let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
 
-        group.bench_with_input(BenchmarkId::new("increment", size), &nibbles, |b, data| {
-            b.iter(|| black_box(data).increment())
-        });
+        group.bench_with_input(size, &nibbles, |b, data| b.iter(|| black_box(data).increment()));
     }
 
     group.finish();
