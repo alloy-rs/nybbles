@@ -1060,6 +1060,10 @@ mod tests {
         let nibbles1 = Nibbles::from_nibbles([0x1]);
         let nibbles2 = Nibbles::from_nibbles([0x0, 0x2]);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Greater);
+
+        let nibbles1 = Nibbles::from_nibbles([vec![0; 61], vec![1; 1], vec![0; 1]].concat());
+        let nibbles2 = Nibbles::from_nibbles([vec![0; 61], vec![1; 1], vec![0; 2]].concat());
+        assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Less);
     }
 
     #[test]
