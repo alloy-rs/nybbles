@@ -850,15 +850,13 @@ impl Nibbles {
 /// `out` must be valid for at least `(self.len() + 1) / 2` bytes.
 #[inline]
 unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
-    let len = nibbles.len();
-    debug_assert!(out.len() >= len.div_ceil(2));
+    let byte_len = nibbles.len().div_ceil(2);
+    debug_assert!(out.len() >= byte_len);
     let ptr = out.as_mut_ptr().cast::<u8>();
-    let mut i = 0;
-    while i < len {
-        let hi = nibbles.get_unchecked(i) << 4;
-        let lo = if i + 1 < len { nibbles.get_unchecked(i + 1) } else { 0 };
-        ptr.add(i / 2).write(hi | lo);
-        i += 2;
+    for (i, byte) in
+        nibbles.nibbles.to_be_bytes::<{ U256::BYTES }>().into_iter().take(byte_len).enumerate()
+    {
+        ptr.add(i).write(byte);
     }
 }
 
