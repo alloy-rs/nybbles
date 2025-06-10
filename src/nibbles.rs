@@ -334,12 +334,19 @@ impl Nibbles {
     #[inline]
     pub fn unpack<T: AsRef<[u8]>>(data: T) -> Self {
         let data = data.as_ref();
-        let length =
-            data.len().checked_mul(2).expect("trying to unpack usize::MAX / 2 bytes") as u8;
-        let mut nibbles = U256::from_be_slice(data);
-        if length > 0 {
-            nibbles = nibbles.wrapping_shl((64 - length as usize) * 4);
+        let length = (data.len() * 2) as u8;
+        debug_assert!(length <= 64);
+
+        let mut nibbles = U256::ZERO;
+        unsafe {
+            // copy input to the *end* of the LE representation
+            core::ptr::copy_nonoverlapping(
+                data.as_ptr(),
+                nibbles.as_le_slice_mut().as_mut_ptr().cast::<u8>().add(U256::BYTES - data.len()),
+                data.len(),
+            );
         }
+
         Self { length, nibbles }
     }
 
