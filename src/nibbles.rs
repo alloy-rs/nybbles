@@ -334,12 +334,25 @@ impl Nibbles {
     #[inline]
     pub fn unpack<T: AsRef<[u8]>>(data: T) -> Self {
         let data = data.as_ref();
-        let length =
-            data.len().checked_mul(2).expect("trying to unpack usize::MAX / 2 bytes") as u8;
-        let mut nibbles = U256::from_be_slice(data);
-        if length > 0 {
-            nibbles = nibbles.wrapping_shl((64 - length as usize) * 4);
+        let length = (data.len() * 2) as u8;
+        debug_assert!(length <= 64);
+
+        let mut nibbles = U256::ZERO;
+
+        // Source pointer is at the beginning
+        let mut src = data.as_ptr().cast::<u8>();
+        // Move destination pointer to the end of the little endian slice
+        let mut dst = unsafe { nibbles.as_le_slice_mut().as_mut_ptr().add(U256::BYTES) };
+        // On each iteration, decrement the destination pointer by one, set the destination byte,
+        // and increment the source pointer by one
+        unsafe {
+            for _ in 0..data.len() {
+                dst = dst.sub(1);
+                *dst = *src;
+                src = src.add(1);
+            }
         }
+
         Self { length, nibbles }
     }
 
@@ -465,7 +478,11 @@ impl Nibbles {
     /// }
     /// ```
     pub const fn get_byte_unchecked(&self, i: usize) -> u8 {
-        self.get_unchecked(i) << 4 | self.get_unchecked(i + 1)
+        if i % 2 == 0 {
+            self.nibbles.as_le_slice()[U256::BYTES - i / 2 - 1]
+        } else {
+            self.get_unchecked(i) << 4 | self.get_unchecked(i + 1)
+        }
     }
 
     /// Increments the nibble sequence by one.
@@ -552,12 +569,12 @@ impl Nibbles {
     ///
     /// Panics if the index is out of bounds.
     pub const fn get_unchecked(&self, i: usize) -> u8 {
-        let pos = 63 - i; // index from the MSB side
-        let limb = pos / 16; // 16 nibbles per u64 limb
-        let offset = (pos % 16) * 4; // offset bits within that limb
-
-        let word = self.nibbles.as_limbs()[limb];
-        ((word >> offset) & 0x0F) as u8
+        let byte = self.nibbles.as_le_slice()[U256::BYTES - i / 2 - 1];
+        if i % 2 == 0 {
+            byte >> 4
+        } else {
+            byte & 0x0F
+        }
     }
 
     /// Sets the nibble at the given index.
@@ -648,7 +665,7 @@ impl Nibbles {
 
         // Find the position of the first differing bit
         let leading_zeros = xor.leading_zeros();
-        
+
         // Convert bit position to nibble position
         // Each nibble is 4 bits, and we're counting from the MSB
         leading_zeros as usize / 4
@@ -850,15 +867,18 @@ impl Nibbles {
 /// `out` must be valid for at least `(self.len() + 1) / 2` bytes.
 #[inline]
 unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
-    let len = nibbles.len();
-    debug_assert!(out.len() >= len.div_ceil(2));
-    let ptr = out.as_mut_ptr().cast::<u8>();
-    let mut i = 0;
-    while i < len {
-        let hi = nibbles.get_unchecked(i) << 4;
-        let lo = if i + 1 < len { nibbles.get_unchecked(i + 1) } else { 0 };
-        ptr.add(i / 2).write(hi | lo);
-        i += 2;
+    let byte_len = nibbles.len().div_ceil(2);
+    debug_assert!(out.len() >= byte_len);
+    // Move source pointer to the end of the little endian slice
+    let mut src = nibbles.nibbles.as_le_slice().as_ptr().add(U256::BYTES);
+    // Destination pointer is at the beginning of the output slice
+    let mut dst = out.as_mut_ptr().cast::<u8>();
+    // On each iteration, decrement the source pointer by one, set the destination byte, and
+    // increment the destination pointer by one
+    for _ in 0..byte_len {
+        src = src.sub(1);
+        *dst = *src;
+        dst = dst.add(1);
     }
 }
 
@@ -1379,6 +1399,9 @@ mod tests {
                 );
             }
         }
+
+        let nibbles = Nibbles::unpack([0xAB, 0xCD]);
+        assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     }
 
     #[test]
