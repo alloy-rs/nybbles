@@ -856,10 +856,8 @@ unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
     let byte_len = nibbles.len().div_ceil(2);
     debug_assert!(out.len() >= byte_len);
     let ptr = out.as_mut_ptr().cast::<u8>();
-    for (i, byte) in
-        nibbles.nibbles.to_be_bytes::<{ U256::BYTES }>().into_iter().take(byte_len).enumerate()
-    {
-        ptr.add(i).write(byte);
+    for (i, byte) in nibbles.nibbles.as_le_slice().iter().rev().take(byte_len).enumerate() {
+        ptr.add(i).write(*byte);
     }
 }
 
