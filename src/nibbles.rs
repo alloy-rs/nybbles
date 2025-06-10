@@ -629,17 +629,13 @@ impl Nibbles {
 
         // Create masks to only consider the bits that are valid for both sequences
         // We need to compare only the bits corresponding to min_len nibbles
-        let mask = if min_len == 64 {
-            U256::MAX
-        } else {
-            U256::MAX << ((64 - min_len) * 4)
-        };
-        
+        let mask = if min_len == 64 { U256::MAX } else { U256::MAX << ((64 - min_len) * 4) };
+
         // Apply mask to both values and XOR to find differing bits
         let masked_self = self.nibbles & mask;
         let masked_other = other.nibbles & mask;
         let xor = masked_self ^ masked_other;
-        
+
         // If they're identical up to min_len, return min_len
         if xor == U256::ZERO {
             return min_len;
@@ -647,12 +643,13 @@ impl Nibbles {
 
         // Find the position of the first differing bit
         let leading_zeros = xor.leading_zeros();
-        
+
         // Convert bit position to nibble position
         // Each nibble is 4 bits, and we're counting from the MSB
-        let first_diff_nibble = leading_zeros as usize / 4;
-        
-        // Make sure we don't exceed min_len (should not be necessary due to masking, but for safety)
+        let first_diff_nibble = leading_zeros / 4;
+
+        // Make sure we don't exceed min_len (should not be necessary due to masking, but for
+        // safety)
         if first_diff_nibble >= min_len {
             min_len
         } else {
