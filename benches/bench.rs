@@ -99,9 +99,18 @@ pub fn bench_slice(c: &mut Criterion) {
     for size in SIZE_NIBBLES {
         let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
 
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles, |b, data| {
+        group.bench_with_input(BenchmarkId::new("from_start", size), &nibbles, |b, data| {
             let end = data.len() / 2;
             b.iter(|| black_box(data).slice(black_box(0..end)))
+        });
+        group.bench_with_input(BenchmarkId::new("middle", size), &nibbles, |b, data| {
+            let start = data.len() / 4;
+            let end = data.len() / 2;
+            b.iter(|| black_box(data).slice(black_box(start..end)))
+        });
+        group.bench_with_input(BenchmarkId::new("to_end", size), &nibbles, |b, data| {
+            let start = data.len() / 2;
+            b.iter(|| black_box(data).slice(black_box(start..)))
         });
     }
 
