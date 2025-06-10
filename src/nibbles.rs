@@ -802,11 +802,24 @@ impl Nibbles {
     ///
     /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
     /// [the type docs](Self) for more details.
+    #[inline]
     pub fn push_unchecked(&mut self, nibble: u8) {
-        let shift = (64 - self.length as usize - 1) * 4;
-        if nibble > 0 {
-            self.nibbles |= U256::from_limbs([(nibble & 0x0F) as u64, 0, 0, 0]).wrapping_shl(shift);
+        let nibble_val = (nibble & 0x0F) as u64;
+        if nibble_val == 0 {
+            self.length += 1;
+            return;
         }
+
+        let bit_pos = (64 - self.length as usize - 1) * 4;
+        let limb_idx = bit_pos / 64;
+        let shift_in_limb = bit_pos % 64;
+
+        // SAFETY: limb_idx is always valid because bit_pos < 256
+        unsafe {
+            let limbs = self.nibbles.as_limbs_mut();
+            limbs[limb_idx] |= nibble_val << shift_in_limb;
+        }
+
         self.length += 1;
     }
 
