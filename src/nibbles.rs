@@ -619,72 +619,45 @@ impl Nibbles {
     /// let b = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0E]);
     /// assert_eq!(a.common_prefix_length(&b), 3);
     /// ```
-    pub const fn common_prefix_length(&self, other: &Self) -> usize {
-        let min_len = if self.len() < other.len() { self.len() } else { other.len() };
-        let mut i = 0;
-        while i < min_len {
-            if self.get_unchecked(i) != other.get_unchecked(i) {
-                return i;
-            }
-            i += 1;
+    pub fn common_prefix_length(&self, other: &Self) -> usize {
+        // Handle empty cases
+        if self.is_empty() || other.is_empty() {
+            return 0;
         }
-        i
 
-        // TODO: the optimized implementation below fails the last test case
+        let min_len = if self.len() < other.len() { self.len() } else { other.len() };
 
-        // const fn count_equal_nibbles(self_limb: u64, other_limb: u64) -> usize {
-        //     // Pad both limbs with trailing zeros to the same effective length
-        //     let lhs_bit_len = u64::BITS - self_limb.leading_zeros(); // Effective bit length of
-        // the left limb     let rhs_bit_len = u64::BITS - other_limb.leading_zeros(); //
-        // Effective bit length of the right limb     let diff = lhs_bit_len as isize -
-        // rhs_bit_len as isize; // Difference in bit lengths     let (lhs, rhs) = if diff <
-        // 0 {         (self_limb << -diff, other_limb)
-        //     } else {
-        //         (self_limb, other_limb << diff)
-        //     }; // Pad one of the limbs
+        // Create masks to only consider the bits that are valid for both sequences
+        // We need to compare only the bits corresponding to min_len nibbles
+        let mask = if min_len == 64 {
+            U256::MAX
+        } else {
+            U256::MAX << ((64 - min_len) * 4)
+        };
+        
+        // Apply mask to both values and XOR to find differing bits
+        let masked_self = self.nibbles & mask;
+        let masked_other = other.nibbles & mask;
+        let xor = masked_self ^ masked_other;
+        
+        // If they're identical up to min_len, return min_len
+        if xor == U256::ZERO {
+            return min_len;
+        }
 
-        //     // Count equal leading bits
-        //     let lz_or = (lhs | rhs).leading_zeros(); // Leading zeros common to both limbs
-        //     let skip = lz_or & !0b11u32; // Leading zeros common to both limbs, rounded down to
-        // the nearest nibble     let lz_xor = (lhs ^ rhs).leading_zeros(); // Leading bits
-        // common to both limbs     (lz_xor - skip) as usize / 4
-        // }
-
-        // let self_bit_len = self.bit_len();
-        // let other_bit_len = other.bit_len();
-
-        // if self_bit_len == 0 || other_bit_len == 0 {
-        //     return 0;
-        // }
-
-        // let min_bit_len = if self_bit_len < other_bit_len { self_bit_len } else { other_bit_len
-        // };
-
-        // // Number of whole limbs
-        // let full_limbs = min_bit_len / 64;
-
-        // let self_limbs = self.nibbles.as_limbs();
-        // let other_limbs = other.nibbles.as_limbs();
-        // let mut common_nibbles = 0;
-
-        // // Walk from MS-limb to LS-limb
-        // let mut i = full_limbs;
-        // while i > 0 {
-        //     i -= 1;
-        //     if self_limbs[i] == other_limbs[i] {
-        //         common_nibbles += 16;
-        //     } else {
-        //         // First differing limb – count equal nibbles inside it
-        //         common_nibbles += count_equal_nibbles(self_limbs[i], other_limbs[i]);
-        //         return common_nibbles;
-        //     }
-        // }
-
-        // if min_bit_len % 64 == 0 {
-        //     return common_nibbles;
-        // }
-
-        // common_nibbles + count_equal_nibbles(self_limbs[0], other_limbs[0])
+        // Find the position of the first differing bit
+        let leading_zeros = xor.leading_zeros();
+        
+        // Convert bit position to nibble position
+        // Each nibble is 4 bits, and we're counting from the MSB
+        let first_diff_nibble = leading_zeros as usize / 4;
+        
+        // Make sure we don't exceed min_len (should not be necessary due to masking, but for safety)
+        if first_diff_nibble >= min_len {
+            min_len
+        } else {
+            first_diff_nibble
+        }
     }
 
     /// Returns the total number of bits in this [`Nibbles`].
