@@ -381,7 +381,7 @@ impl Nibbles {
     /// ```
     #[inline]
     pub fn pack(&self) -> SmallVec<[u8; 32]> {
-        let packed_len = (self.len() + 1) / 2;
+        let packed_len = self.len().div_ceil(2);
         unsafe { smallvec_with(packed_len, |out| self.pack_to_unchecked2(out)) }
     }
 
@@ -429,7 +429,7 @@ impl Nibbles {
     #[inline]
     #[deprecated = "prefer using `pack_to` or `pack_to_unchecked2` instead"]
     pub unsafe fn pack_to_unchecked(&self, ptr: *mut u8) {
-        self.pack_to_unchecked2(slice::from_raw_parts_mut(ptr.cast(), (self.len() + 1) / 2));
+        self.pack_to_unchecked2(slice::from_raw_parts_mut(ptr.cast(), self.len().div_ceil(2)));
     }
 
     /// Packs the nibbles into the given slice without checking its length.
@@ -747,7 +747,7 @@ pub unsafe fn get_byte_unchecked(nibbles: &[u8], i: usize) -> u8 {
 /// ```
 #[inline]
 pub fn pack_to(nibbles: &[u8], out: &mut [u8]) {
-    assert!(out.len() >= (nibbles.len() + 1) / 2);
+    assert!(out.len() >= nibbles.len().div_ceil(2);
     // SAFETY: asserted length.
     unsafe {
         let out = slice::from_raw_parts_mut(out.as_mut_ptr().cast(), out.len());
@@ -763,7 +763,7 @@ pub fn pack_to(nibbles: &[u8], out: &mut [u8]) {
 #[inline]
 pub unsafe fn pack_to_unchecked(nibbles: &[u8], out: &mut [MaybeUninit<u8>]) {
     let len = nibbles.len();
-    debug_assert!(out.len() >= (len + 1) / 2);
+    debug_assert!(out.len() >= len.div_ceil(2);
     let ptr = out.as_mut_ptr().cast::<u8>();
     for i in 0..len / 2 {
         ptr.add(i).write(get_byte_unchecked(nibbles, i * 2));
