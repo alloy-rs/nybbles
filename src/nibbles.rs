@@ -383,9 +383,9 @@ impl Nibbles {
     #[inline]
     #[track_caller]
     pub fn pack_to(&self, out: &mut [u8]) {
-        let byte_len = self.len().div_ceil(2);
-        assert!(out.len() >= byte_len);
-        out.copy_from_slice(&self.nibbles.to_be_bytes::<{ U256::BYTES }>()[..byte_len]);
+        assert!(out.len() >= self.len().div_ceil(2));
+        // SAFETY: asserted length.
+        unsafe { self.pack_to_unchecked(out.as_mut_ptr()) }
     }
 
     /// Packs the nibbles into the given pointer.
