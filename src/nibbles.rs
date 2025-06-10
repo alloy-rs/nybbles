@@ -20,25 +20,35 @@ use alloc::vec::Vec;
 
 type Repr = U256;
 
-/// This array contains 65 bitmasks used in [`Nibbles::slice`].
-///
-/// Each mask is a [`U256`] where:
-/// - Index 0 is just 0 (no bits set)
-/// - Index 1 has the lowest 4 bits set (one nibble)
-/// - Index 2 has the lowest 8 bits set (two nibbles)
-/// - ...and so on
-/// - Index 64 has all bits set ([`U256::MAX`])
-const SLICE_MASKS: [U256; 65] = {
-    let mut masks = [U256::ZERO; 65];
+/// This array contains bitmasks used in [`Nibbles::slice`].
+const SLICE_MASKS: [[U256; 65]; 65] = {
+    let mut masks = [[U256::ZERO; 65]; 65];
     let mut i = 0;
     while i <= 64 {
-        masks[i] = if i == 0 { U256::ZERO } else { U256::MAX.wrapping_shl(256 - i * 4) };
+        let i_mask = U256::MAX.wrapping_shl(256 - i * 4);
+        let mut j = 0;
+        while j <= 64 {
+            let j_mask = U256::MAX.wrapping_shl(256 - j * 4);
+            masks[i][j] = i_mask.bitxor(j_mask);
+            j += 1;
+        }
         i += 1;
     }
     masks
 };
 
-/// This array contains 65 increment masks used in [`Nibbles::increment`].
+/// This array contains bitmasks used in [`Nibbles::increment`].
+const INCREMENT_SLICE_MASKS: [U256; 65] = {
+    let mut masks = [U256::ZERO; 65];
+    let mut i = 0;
+    while i <= 64 {
+        masks[i] = U256::MAX.wrapping_shl(256 - i * 4);
+        i += 1;
+    }
+    masks
+};
+
+/// This array contains increment masks used in [`Nibbles::increment`].
 ///
 /// Each mask is a [`U256`] equal to `1 << ((64 - i) * 4)`.
 const INCREMENT_MASKS: [U256; 65] = {
@@ -471,7 +481,7 @@ impl Nibbles {
     /// Increments the nibble sequence by one.
     #[inline]
     pub fn increment(&self) -> Option<Self> {
-        let mask = SLICE_MASKS[self.len()];
+        let mask = INCREMENT_SLICE_MASKS[self.len()];
         if self.nibbles == mask {
             return None;
         }
@@ -629,17 +639,13 @@ impl Nibbles {
 
         // Create masks to only consider the bits that are valid for both sequences
         // We need to compare only the bits corresponding to min_len nibbles
-        let mask = if min_len == 64 {
-            U256::MAX
-        } else {
-            U256::MAX << ((64 - min_len) * 4)
-        };
-        
+        let mask = if min_len == 64 { U256::MAX } else { U256::MAX << ((64 - min_len) * 4) };
+
         // Apply mask to both values and XOR to find differing bits
         let masked_self = self.nibbles & mask;
         let masked_other = other.nibbles & mask;
         let xor = masked_self ^ masked_other;
-        
+
         // If they're identical up to min_len, return min_len
         if xor == U256::ZERO {
             return min_len;
@@ -647,12 +653,13 @@ impl Nibbles {
 
         // Find the position of the first differing bit
         let leading_zeros = xor.leading_zeros();
-        
+
         // Convert bit position to nibble position
         // Each nibble is 4 bits, and we're counting from the MSB
         let first_diff_nibble = leading_zeros as usize / 4;
-        
-        // Make sure we don't exceed min_len (should not be necessary due to masking, but for safety)
+
+        // Make sure we don't exceed min_len (should not be necessary due to masking, but for
+        // safety)
         if first_diff_nibble >= min_len {
             min_len
         } else {
@@ -709,7 +716,8 @@ impl Nibbles {
 
         let nibble_len = end - start;
 
-        let mask = SLICE_MASKS[end].bitxor(SLICE_MASKS[start]);
+        let mask = SLICE_MASKS[end][start];
+        // let mask = INCREMENT_SLICE_MASKS[end].bitxor(INCREMENT_SLICE_MASKS[start]);
         let nibbles = self.nibbles.bitand(mask).wrapping_shl(start * 4);
 
         Self { length: nibble_len as u8, nibbles }
