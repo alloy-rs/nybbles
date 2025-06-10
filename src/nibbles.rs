@@ -472,7 +472,11 @@ impl Nibbles {
     /// }
     /// ```
     pub const fn get_byte_unchecked(&self, i: usize) -> u8 {
-        self.get_unchecked(i) << 4 | self.get_unchecked(i + 1)
+        if i % 2 == 0 {
+            self.nibbles.as_le_slice()[U256::BYTES - i / 2 - 1]
+        } else {
+            self.get_unchecked(i) << 4 | self.get_unchecked(i + 1)
+        }
     }
 
     /// Increments the nibble sequence by one.
@@ -559,12 +563,12 @@ impl Nibbles {
     ///
     /// Panics if the index is out of bounds.
     pub const fn get_unchecked(&self, i: usize) -> u8 {
-        let pos = 63 - i; // index from the MSB side
-        let limb = pos / 16; // 16 nibbles per u64 limb
-        let offset = (pos % 16) * 4; // offset bits within that limb
-
-        let word = self.nibbles.as_limbs()[limb];
-        ((word >> offset) & 0x0F) as u8
+        let byte = self.nibbles.as_le_slice()[U256::BYTES - i / 2 - 1];
+        if i % 2 == 0 {
+            byte >> 4
+        } else {
+            byte & 0x0F
+        }
     }
 
     /// Sets the nibble at the given index.
