@@ -709,8 +709,16 @@ impl Nibbles {
 
         let nibble_len = end - start;
 
-        let mask = SLICE_MASKS[end].bitxor(SLICE_MASKS[start]);
-        let nibbles = self.nibbles.bitand(mask).wrapping_shl(start * 4);
+        // Optimize for common case where start == 0
+        let nibbles = if start == 0 {
+            // When slicing from the beginning, we only need the end mask
+            // This avoids the XOR operation
+            self.nibbles.bitand(SLICE_MASKS[end])
+        } else {
+            // General case: XOR masks and shift
+            let mask = SLICE_MASKS[end].bitxor(SLICE_MASKS[start]);
+            self.nibbles.bitand(mask).wrapping_shl(start * 4)
+        };
 
         Self { length: nibble_len as u8, nibbles }
     }
