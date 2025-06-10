@@ -338,13 +338,19 @@ impl Nibbles {
         debug_assert!(length <= 64);
 
         let mut nibbles = U256::ZERO;
+
+        // Source pointer is at the beginning
+        let mut src = data.as_ptr().cast::<u8>();
+        // Move destination pointer to the end of the little endian slice
+        let mut dst = unsafe { nibbles.as_le_slice_mut().as_mut_ptr().add(U256::BYTES) };
+        // On each iteration, decrement the destination pointer by one, set the destination byte,
+        // and increment the source pointer by one
         unsafe {
-            // copy input to the *end* of the LE representation
-            core::ptr::copy_nonoverlapping(
-                data.as_ptr(),
-                nibbles.as_le_slice_mut().as_mut_ptr().cast::<u8>().add(U256::BYTES - data.len()),
-                data.len(),
-            );
+            for _ in 0..data.len() {
+                dst = dst.sub(1);
+                *dst = *src;
+                src = src.add(1);
+            }
         }
 
         Self { length, nibbles }
@@ -1396,6 +1402,9 @@ mod tests {
                 );
             }
         }
+
+        let nibbles = Nibbles::unpack([0xAB, 0xCD]);
+        assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     }
 
     #[test]
