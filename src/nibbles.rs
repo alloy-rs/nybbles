@@ -129,7 +129,7 @@ impl Ord for Nibbles {
             }
         }
 
-        self_len.cmp(&other_len)
+        self.len().cmp(&other.len())
     }
 }
 
