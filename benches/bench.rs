@@ -93,60 +93,6 @@ pub fn bench_push(c: &mut Criterion) {
     group.finish();
 }
 
-pub fn bench_push_unchecked(c: &mut Criterion) {
-    let mut group = c.benchmark_group("push_unchecked");
-
-    for size in SIZE_NIBBLES {
-        group.throughput(Throughput::Elements(size as u64));
-
-        let nibbles = generate_nibbles(size);
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles, |b, nibbles| {
-            b.iter(|| {
-                let mut nib = Nibbles::new();
-                for nibble in nibbles {
-                    nib.push_unchecked(black_box(*nibble));
-                }
-                nib
-            })
-        });
-    }
-
-    group.finish();
-}
-
-pub fn bench_push_comparison(c: &mut Criterion) {
-    let mut group = c.benchmark_group("push_comparison");
-
-    for size in SIZE_NIBBLES {
-        group.throughput(Throughput::Elements(size as u64));
-
-        let nibbles = generate_nibbles(size);
-
-        group.bench_with_input(BenchmarkId::new("push", size), &nibbles, |b, nibbles| {
-            b.iter(|| {
-                let mut nib = Nibbles::new();
-                for nibble in nibbles {
-                    nib.push(black_box(*nibble));
-                }
-                nib
-            })
-        });
-
-        group.bench_with_input(BenchmarkId::new("push_unchecked", size), &nibbles, |b, nibbles| {
-            b.iter(|| {
-                let mut nib = Nibbles::new();
-                for nibble in nibbles {
-                    nib.push_unchecked(black_box(*nibble));
-                }
-                nib
-            })
-        });
-    }
-
-    group.finish();
-}
-
 pub fn bench_slice(c: &mut Criterion) {
     let mut group = c.benchmark_group("slice");
 
