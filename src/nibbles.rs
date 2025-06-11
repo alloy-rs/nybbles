@@ -164,7 +164,10 @@ impl FromIterator<u8> for Nibbles {
 impl alloy_rlp::Encodable for Nibbles {
     #[inline]
     fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
-        alloy_rlp::Encodable::encode(&self.to_vec(), out)
+        alloy_rlp::Header { list: true, payload_length: self.len() }.encode(out);
+        for i in 0..self.len() {
+            self.get_unchecked(i).encode(out);
+        }
     }
 
     #[inline]
