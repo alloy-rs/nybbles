@@ -620,7 +620,7 @@ impl Nibbles {
         // SAFETY: index checked above
         let byte = unsafe { &mut self.nibbles.as_le_slice_mut()[byte_index] };
         if i % 2 == 0 {
-            *byte |= value << 4;
+            *byte = *byte & 0x0f | value << 4;
         } else {
             *byte = *byte & 0xf0 | value;
         }
