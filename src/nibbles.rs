@@ -20,6 +20,9 @@ use alloc::vec::Vec;
 
 type Repr = U256;
 
+/// The size of [`U256`] in nibbles.
+const NIBBLES: usize = 64;
+
 /// This array contains 65 bitmasks used in [`Nibbles::slice`].
 ///
 /// Each mask is a [`U256`] where:
@@ -642,39 +645,40 @@ impl Nibbles {
             return 0;
         }
 
-        let min_len = self.len().min(other.len());
+        let min_nibble_len = self.len().min(other.len());
 
         // Fast path for small sequences that fit in one u64 limb
-        if min_len <= 16 {
+        if min_nibble_len <= 16 {
             // Extract the highest u64 limb which contains all the nibbles
             let self_limb = self.nibbles.as_limbs()[3];
             let other_limb = other.nibbles.as_limbs()[3];
 
             // Create mask for the nibbles we care about
-            let mask = u64::MAX << ((16 - min_len) * 4);
+            let mask = u64::MAX << ((16 - min_nibble_len) * 4);
             let xor = (self_limb & mask) ^ (other_limb & mask);
 
             if xor == 0 {
-                return min_len;
+                return min_nibble_len;
             } else {
                 return xor.leading_zeros() as usize / 4;
             }
         }
 
-        // For larger sequences, use our optimized U256 approach
-        let xor = if min_len == 64 && self.len() == other.len() {
+        let xor = if min_nibble_len == NIBBLES && self.len() == other.len() {
+            // No need to mask for 64 nibble sequences, just XOR
             self.nibbles ^ other.nibbles
         } else {
-            let mask = SLICE_MASKS[min_len];
+            // For other lengths, mask the nibbles we care about, and then XOR
+            let mask = SLICE_MASKS[min_nibble_len];
             let masked_self = self.nibbles & mask;
             let masked_other = other.nibbles & mask;
             masked_self ^ masked_other
         };
 
         if xor == U256::ZERO {
-            min_len
+            min_nibble_len
         } else {
-            xor.leading_zeros() as usize / 4
+            xor.leading_zeros() / 4
         }
     }
 
@@ -800,19 +804,20 @@ impl Nibbles {
 
     /// Pushes a nibble to the end of the current nibbles without checking its validity.
     ///
-    /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
-    /// [the type docs](Self) for more details.
+    /// Note that only the low nibble of the byte is used. For example, for byte `0x12`, only the
+    /// nibble `0x2` is pushed.
     #[inline]
     pub fn push_unchecked(&mut self, nibble: u8) {
         let nibble_val = (nibble & 0x0F) as u64;
         if nibble_val == 0 {
+            // Nothing to do, limb nibbles are already set to zero by default
             self.length += 1;
             return;
         }
 
-        let bit_pos = (64 - self.length as usize - 1) * 4;
-        let limb_idx = bit_pos / 64;
-        let shift_in_limb = bit_pos % 64;
+        let bit_pos = (NIBBLES - self.length as usize - 1) * 4;
+        let limb_idx = bit_pos / NIBBLES;
+        let shift_in_limb = bit_pos % NIBBLES;
 
         // SAFETY: limb_idx is always valid because bit_pos < 256
         unsafe {
@@ -828,26 +833,26 @@ impl Nibbles {
         if self.length == 0 {
             return None;
         }
-        
+
         // The last nibble is at bit position (64 - length) * 4 from the MSB
-        let shift = (64 - self.length as usize) * 4;
-        
+        let shift = (NIBBLES - self.length as usize) * 4;
+
         // Extract the nibble - after shifting right, it's in the lowest bits of limb 0
         let nibble = ((self.nibbles.wrapping_shr(shift).as_limbs()[0]) & 0xF) as u8;
-        
+
         // Clear the nibble using a more efficient mask creation
         // Instead of U256::from(0xF_u8) << shift, we can create the mask directly
-        let mask_limb_idx = shift / 64;
-        let mask_shift = shift % 64;
-        
+        let mask_limb_idx = shift / NIBBLES;
+        let mask_shift = shift % NIBBLES;
+
         if mask_limb_idx < 4 {
             // SAFETY: We know the limb index is valid
             unsafe {
                 let limbs = self.nibbles.as_limbs_mut();
-                limbs[mask_limb_idx] &= !(0xF_u64 << mask_shift);
+                limbs[mask_limb_idx] &= !(0xF << mask_shift);
             }
         }
-        
+
         self.length -= 1;
         Some(nibble)
     }
