@@ -60,15 +60,11 @@ const INCREMENT_MASKS: [U256; 65] = {
 ///
 /// # Internal representation
 ///
-/// The internal representation is currently a [`SmallVec`] that stores one nibble per byte. Nibbles
-/// are stored inline (on the stack) up to a length of 64 nibbles, or 32 unpacked bytes. This means
-/// that each byte has its upper 4 bits set to zero and the lower 4 bits representing the nibble
-/// value.
+/// The internal representation is currently a [`U256`] that stores two nibbles per byte. Nibbles
+/// are stored inline (on the stack), and can be up to a length of 64 nibbles, or 32 unpacked bytes.
 ///
-/// This is enforced in the public API, but it is possible to create invalid [`Nibbles`] instances
-/// using methods suffixed with `_unchecked`. These methods are not marked as `unsafe` as they
-/// are not memory-unsafe, but creating invalid values will cause unexpected behavior in other
-/// methods, and users should exercise caution when using them.
+/// Nibbles are stored with most significant bits set first, meaning that a nibble sequence `0x101`
+/// will be stored as `0x101...0`, and not `0x0...101`.
 ///
 /// # Examples
 ///
@@ -92,7 +88,8 @@ pub struct Nibbles {
     // This field goes first, because the derived implementation of `PartialEq` compares the fields
     // in order, so we can short-circuit the comparison if the `length` field differs.
     pub(crate) length: u8,
-    /// The nibbles themselves, stored as a 256-bit unsigned integer.
+    /// The nibbles themselves, stored as a 256-bit unsigned integer with most significant bits set
+    /// first.
     pub(crate) nibbles: U256,
 }
 
@@ -144,7 +141,9 @@ impl Index<usize> for Nibbles {
     type Output = u8;
 
     fn index(&self, index: usize) -> &Self::Output {
-        /// List of possible nibbles to return static references.
+        /// List of possible nibbles to return static references. It's a hack that allows us to
+        /// return a reference to a nibble, even though we cannot address nibbles directly and must
+        /// go through bytes first.
         static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
         &NIBBLES[self.get_unchecked(index) as usize]

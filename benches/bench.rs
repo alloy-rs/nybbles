@@ -75,9 +75,9 @@ pub fn bench_push(c: &mut Criterion) {
     let mut group = c.benchmark_group("push");
 
     for size in SIZE_NIBBLES {
-        group.throughput(Throughput::Elements(size as u64));
-
         let nibbles = generate_nibbles(size);
+
+        group.throughput(Throughput::Elements(size as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles, |b, nibbles| {
             b.iter(|| {
