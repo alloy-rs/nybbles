@@ -325,7 +325,7 @@ impl Nibbles {
     ///
     /// # Panics
     ///
-    /// Panics if the length of the input is greater than `usize::MAX / 2`.
+    /// Panics if the length of the input is greater than 32 bytes.
     ///
     /// # Examples
     ///
@@ -336,24 +336,43 @@ impl Nibbles {
     /// ```
     #[inline]
     pub fn unpack<T: AsRef<[u8]>>(data: T) -> Self {
+        assert!(data.as_ref().len() <= U256::BYTES);
+        // Safety: we checked that the length is less than or equal to the size of U256
+        unsafe { Self::unpack_unchecked(data) }
+    }
+
+    /// Converts a byte slice into a [`Nibbles`] instance containing the nibbles (half-bytes or 4
+    /// bits) that make up the input byte data.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the length of the input is less than or equal to the size of
+    /// U256, which is 32 bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::unpack_unchecked(&[0xAB, 0xCD]);
+    /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
+    /// ```
+    pub unsafe fn unpack_unchecked<T: AsRef<[u8]>>(data: T) -> Self {
         let data = data.as_ref();
         let length = (data.len() * 2) as u8;
-        debug_assert!(length <= 64);
+        debug_assert!(length as usize <= NIBBLES);
 
         let mut nibbles = U256::ZERO;
 
         // Source pointer is at the beginning
         let mut src = data.as_ptr().cast::<u8>();
         // Move destination pointer to the end of the little endian slice
-        let mut dst = unsafe { nibbles.as_le_slice_mut().as_mut_ptr().add(U256::BYTES) };
-        // On each iteration, decrement the destination pointer by one, set the destination byte,
-        // and increment the source pointer by one
-        unsafe {
-            for _ in 0..data.len() {
-                dst = dst.sub(1);
-                *dst = *src;
-                src = src.add(1);
-            }
+        let mut dst = nibbles.as_le_slice_mut().as_mut_ptr().add(U256::BYTES);
+        // On each iteration, decrement the destination pointer by one, set the destination
+        // byte, and increment the source pointer by one
+        for _ in 0..data.len() {
+            dst = dst.sub(1);
+            *dst = *src;
+            src = src.add(1);
         }
 
         Self { length, nibbles }
@@ -428,6 +447,11 @@ impl Nibbles {
         pack_to_unchecked(self, slice);
     }
 
+    /// Packs the nibbles into the given slice without checking its length.
+    ///
+    /// # Safety
+    ///
+    /// `out` must be valid for at least `(self.len() + 1) / 2` bytes.
     #[inline]
     pub unsafe fn pack_to_slice_unchecked(&self, out: &mut [MaybeUninit<u8>]) {
         pack_to_unchecked(self, out)
