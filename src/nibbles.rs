@@ -109,7 +109,7 @@ impl fmt::Debug for Nibbles {
 // integers without accounting for length. This is incorrect, because `0x1` should be considered
 // greater than `0x02`.
 impl Ord for Nibbles {
-    #[inline(always)]
+    #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         let self_len = self.len().div_ceil(2);
         let other_len = other.len().div_ceil(2);
