@@ -25,15 +25,15 @@ const NIBBLES: usize = 64;
 ///
 /// Each mask is a [`U256`] where:
 /// - Index 0 is just 0 (no bits set)
-/// - Index 1 has the lowest 4 bits set (one nibble)
-/// - Index 2 has the lowest 8 bits set (two nibbles)
+/// - Index 1 has the highest 4 bits set (one nibble)
+/// - Index 2 has the highest 8 bits set (two nibbles)
 /// - ...and so on
 /// - Index 64 has all bits set ([`U256::MAX`])
 const SLICE_MASKS: [U256; 65] = {
     let mut masks = [U256::ZERO; 65];
     let mut i = 0;
-    while i <= 64 {
-        masks[i] = if i == 0 { U256::ZERO } else { U256::MAX.wrapping_shl(256 - i * 4) };
+    while i <= NIBBLES {
+        masks[i] = if i == 0 { U256::ZERO } else { U256::MAX.wrapping_shl((NIBBLES - i) * 4) };
         i += 1;
     }
     masks
@@ -45,8 +45,8 @@ const SLICE_MASKS: [U256; 65] = {
 const INCREMENT_MASKS: [U256; 65] = {
     let mut masks = [U256::ZERO; 65];
     let mut i = 0;
-    while i <= 64 {
-        masks[i] = U256::ONE.wrapping_shl((64 - i) * 4);
+    while i <= NIBBLES {
+        masks[i] = U256::ONE.wrapping_shl((NIBBLES - i) * 4);
         i += 1;
     }
     masks
