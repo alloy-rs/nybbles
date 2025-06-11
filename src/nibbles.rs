@@ -698,19 +698,19 @@ impl Nibbles {
     }
 
     /// Returns the total number of bits in this [`Nibbles`].
-    #[inline(always)]
+    #[inline]
     const fn bit_len(&self) -> usize {
         self.length as usize * 4
     }
 
     /// Returns `true` if this [`Nibbles`] is empty.
-    #[inline(always)]
+    #[inline]
     pub const fn is_empty(&self) -> bool {
         self.length == 0
     }
 
     /// Returns the total number of nibbles in this [`Nibbles`].
-    #[inline(always)]
+    #[inline]
     pub const fn len(&self) -> usize {
         self.length as usize
     }
