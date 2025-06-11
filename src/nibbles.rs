@@ -894,7 +894,7 @@ impl Nibbles {
         let len_bytes = other.len();
         let mut other = U256::from_be_slice(other);
         if len_bytes > 0 {
-            other = other.wrapping_shl((32 - len_bytes) * 8);
+            other = other.wrapping_shl((U256::BYTES - len_bytes) * 8);
         }
         self.nibbles |= other.wrapping_shr(self.bit_len());
         self.length += (len_bytes * 2) as u8;
