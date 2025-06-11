@@ -104,7 +104,7 @@ impl fmt::Debug for Nibbles {
         if self.is_empty() {
             write!(f, "Nibbles(0x)")
         } else {
-            let shifted = self.nibbles.wrapping_shr((64 - self.len()) * 4);
+            let shifted = self.nibbles.wrapping_shr((NIBBLES - self.len()) * 4);
             write!(f, "Nibbles(0x{:0width$x})", shifted, width = self.len())
         }
     }
@@ -581,13 +581,9 @@ impl Nibbles {
 
     /// Returns the nibble at the given index.
     pub fn get(&self, i: usize) -> Option<u8> {
-        // How far from the most-significant nibble?
-        let pos_from_back = self.len().checked_sub(1)?.checked_sub(i)?; // 0-based from MSB
-        let limb = pos_from_back / 16; // 16 nibbles per u64 limb
-        let offset = (pos_from_back % 16) * 4; // Offset bits within that limb, so we get the one we're interested in
-
-        let word = self.nibbles.as_limbs()[limb];
-        Some(((word >> offset) & 0x0F) as u8)
+        let byte_index = U256::BYTES.checked_sub(i / 2)?.checked_sub(1)?;
+        let byte = self.nibbles.as_le_slice().get(byte_index)?;
+        Some(if i % 2 == 0 { byte >> 4 } else { byte & 0x0F })
     }
 
     /// Returns the nibble at the given index.
@@ -612,27 +608,27 @@ impl Nibbles {
     #[inline]
     #[track_caller]
     pub fn set_at(&mut self, i: usize, value: u8) {
-        assert!(value <= 0xf);
-        self.set_at_unchecked(i, value);
+        assert!(i < self.length as usize && value <= 0xf);
+        // Safety: index is checked above
+        unsafe { self.set_at_unchecked(i, value) };
     }
 
     /// Sets the nibble at the given index, without checking its validity.
     ///
-    /// # Panics
+    /// # Safety
     ///
-    /// Panics if the index is out of bounds.
+    /// The caller must ensure that the index is within bounds.
     #[inline]
     #[track_caller]
-    pub fn set_at_unchecked(&mut self, i: usize, value: u8) {
-        assert!(i < self.length as usize, "index out of bounds");
-        let pos = 63 - i; // index from MSB
-        let limb = pos / 16;
-        let offset = (pos % 16) * 4;
-
+    pub unsafe fn set_at_unchecked(&mut self, i: usize, value: u8) {
+        let byte_index = U256::BYTES - i / 2 - 1;
         // SAFETY: index checked above
-        let word = unsafe { self.nibbles.as_limbs_mut().get_unchecked_mut(limb) };
-        *word &= !(0xF << offset);
-        *word |= (value as u64) << offset;
+        let byte = unsafe { &mut self.nibbles.as_le_slice_mut()[byte_index] };
+        if i % 2 == 0 {
+            *byte |= value << 4;
+        } else {
+            *byte = *byte & 0xf0 | value;
+        }
     }
 
     /// Returns the first nibble of this nibble sequence.
@@ -1027,11 +1023,28 @@ mod tests {
 
     #[test]
     fn get_unchecked() {
-        for len in 0..64 {
+        for len in 0..NIBBLES {
             let raw = (0..16).cycle().take(len).collect::<Vec<u8>>();
             let nibbles = Nibbles::from_nibbles(&raw);
             for (i, raw_nibble) in raw.into_iter().enumerate() {
                 assert_eq!(nibbles.get_unchecked(i), raw_nibble);
+            }
+        }
+    }
+
+    #[test]
+    fn set_at_unchecked() {
+        for len in 0..=NIBBLES {
+            let raw = (0..16).cycle().take(len).collect::<Vec<u8>>();
+            let mut nibbles = Nibbles::from_nibbles(&raw);
+            for (i, raw_nibble) in raw.iter().enumerate() {
+                let new_nibble = (raw_nibble + 1) % 16;
+                unsafe { nibbles.set_at_unchecked(i, new_nibble) };
+
+                let mut new_raw_nibbles = nibbles.clone().to_vec();
+                new_raw_nibbles[i] = new_nibble;
+                let new_nibbles = Nibbles::from_nibbles(&new_raw_nibbles);
+                assert_eq!(nibbles, new_nibbles,);
             }
         }
     }
