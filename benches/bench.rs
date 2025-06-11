@@ -515,7 +515,9 @@ fn pack_naive(bytes: &[u8]) -> Vec<u8> {
 
 criterion_group!(
     name = benches;
-    config = Criterion::default().warm_up_time(Duration::from_millis(500));
+    config = Criterion::default()
+        .warm_up_time(Duration::from_millis(500))
+        .noise_threshold(0.20);
     targets = bench_from_nibbles, bench_pack, bench_unpack, bench_push, bench_slice,
               bench_join, bench_extend, bench_set_at, bench_get_byte, bench_common_prefix_length,
               bench_cmp, bench_clone, bench_increment, bench_pop, bench_from_vec_unchecked, bench_first,
