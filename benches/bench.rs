@@ -344,6 +344,31 @@ pub fn bench_increment(c: &mut Criterion) {
     group.finish();
 }
 
+pub fn bench_pop(c: &mut Criterion) {
+    let mut group = c.benchmark_group("pop");
+
+    for size in SIZE_NIBBLES {
+        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
+
+        group.throughput(Throughput::Elements(size as u64));
+
+        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles, |b, data| {
+            b.iter_batched(
+                || *data,
+                |mut nib| {
+                    for _ in 0..nib.len() {
+                        black_box(nib.pop());
+                    }
+                    nib
+                },
+                criterion::BatchSize::SmallInput,
+            )
+        });
+    }
+
+    group.finish();
+}
+
 pub fn nibbles_benchmark(c: &mut Criterion) {
     {
         let mut g = c.benchmark_group("unpack");
@@ -414,7 +439,7 @@ criterion_group!(
     config = Criterion::default().warm_up_time(Duration::from_millis(500));
     targets = bench_from_nibbles, bench_pack, bench_unpack, bench_push, bench_push_unchecked, bench_push_comparison, bench_slice,
               bench_join, bench_extend, bench_set_at, bench_get_byte, bench_common_prefix_length,
-              bench_cmp, bench_clone, bench_increment, nibbles_benchmark
+              bench_cmp, bench_clone, bench_increment, bench_pop, nibbles_benchmark
 );
 criterion_main!(benches);
 

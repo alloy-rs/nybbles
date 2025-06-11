@@ -828,9 +828,26 @@ impl Nibbles {
         if self.length == 0 {
             return None;
         }
+        
+        // The last nibble is at bit position (64 - length) * 4 from the MSB
         let shift = (64 - self.length as usize) * 4;
+        
+        // Extract the nibble - after shifting right, it's in the lowest bits of limb 0
         let nibble = ((self.nibbles.wrapping_shr(shift).as_limbs()[0]) & 0xF) as u8;
-        self.nibbles &= !(U256::from(0xF_u8) << shift);
+        
+        // Clear the nibble using a more efficient mask creation
+        // Instead of U256::from(0xF_u8) << shift, we can create the mask directly
+        let mask_limb_idx = shift / 64;
+        let mask_shift = shift % 64;
+        
+        if mask_limb_idx < 4 {
+            // SAFETY: We know the limb index is valid
+            unsafe {
+                let limbs = self.nibbles.as_limbs_mut();
+                limbs[mask_limb_idx] &= !(0xF_u64 << mask_shift);
+            }
+        }
+        
         self.length -= 1;
         Some(nibble)
     }
