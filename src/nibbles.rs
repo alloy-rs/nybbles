@@ -335,7 +335,7 @@ impl Nibbles {
     #[inline]
     pub fn unpack<T: AsRef<[u8]>>(data: T) -> Self {
         assert!(data.as_ref().len() <= U256::BYTES);
-        // Safety: we checked that the length is less than or equal to the size of U256
+        // SAFETY: we checked that the length is less than or equal to the size of U256
         unsafe { Self::unpack_unchecked(data) }
     }
 
@@ -351,7 +351,8 @@ impl Nibbles {
     ///
     /// ```
     /// # use nybbles::Nibbles;
-    /// let nibbles = Nibbles::unpack_unchecked(&[0xAB, 0xCD]);
+    /// // SAFETY: the length of the input is less than 32 bytes.
+    /// let nibbles = unsafe { Nibbles::unpack_unchecked(&[0xAB, 0xCD]) };
     /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     /// ```
     pub unsafe fn unpack_unchecked<T: AsRef<[u8]>>(data: T) -> Self {
@@ -607,7 +608,7 @@ impl Nibbles {
     #[track_caller]
     pub fn set_at(&mut self, i: usize, value: u8) {
         assert!(i < self.length as usize && value <= 0xf);
-        // Safety: index is checked above
+        // SAFETY: index is checked above
         unsafe { self.set_at_unchecked(i, value) };
     }
 
