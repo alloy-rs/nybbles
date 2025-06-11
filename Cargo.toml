@@ -17,7 +17,7 @@ smallvec = { version = "1.0", default-features = false, features = [
     "const_new",
     "union",
 ] }
-ruint = "1"
+ruint = { version = "1", default-features = false }
 
 # serde
 serde = { version = "1.0", default-features = false, optional = true, features = [
@@ -41,7 +41,7 @@ criterion = { version = "2.10", package = "codspeed-criterion-compat" }
 
 [features]
 default = ["std"]
-std = ["serde?/std", "alloy-rlp?/std", "proptest?/std"]
+std = ["serde?/std", "alloy-rlp?/std", "proptest?/std", "ruint/std"]
 nightly = ["smallvec/specialization", "smallvec/may_dangle"]
 serde = ["dep:serde", "ruint/serde", "smallvec/serde"]
 rlp = ["dep:alloy-rlp"]
