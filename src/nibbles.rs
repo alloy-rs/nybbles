@@ -18,8 +18,6 @@ use core::intrinsics::{likely, unlikely};
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
-type Repr = U256;
-
 /// The size of [`U256`] in nibbles.
 const NIBBLES: usize = 64;
 
@@ -207,7 +205,7 @@ impl Nibbles {
         Self { length: 0, nibbles: U256::ZERO }
     }
 
-    /// Same as [`FromIteartor`] implementation, but skips the validity check.
+    /// Same as [`FromIterator`] implementation, but skips the validity check.
     pub fn from_iter_unchecked<I>(iter: I) -> Self
     where
         I: IntoIterator<Item = u8>,
@@ -720,12 +718,12 @@ impl Nibbles {
         self.length as usize
     }
 
-    /// Returns a mutable reference to the underlying [`Repr`].
+    /// Returns a mutable reference to the underlying [`U256`].
     ///
     /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
     /// [the type docs](Self) for more details.
     #[inline]
-    pub fn as_mut_uint_unchecked(&mut self) -> &mut Repr {
+    pub fn as_mut_uint_unchecked(&mut self) -> &mut U256 {
         &mut self.nibbles
     }
 
@@ -1013,10 +1011,7 @@ mod tests {
             assert_eq!(
                 &encoded[..],
                 expected,
-                "input: {:x?}, expected: {:x?}, got: {:x?}",
-                input,
-                expected,
-                encoded
+                "input: {input:x?}, expected: {expected:x?}, got: {encoded:x?}",
             );
         }
     }
@@ -1452,15 +1447,12 @@ mod tests {
             assert_eq!(
                 packed_nibbles.len(),
                 nibbles.len(),
-                "Test case {}: Length mismatch for bytes {:?}",
-                test_idx,
-                bytes
+                "Test case {test_idx}: Length mismatch for bytes {bytes:?}",
             );
             assert_eq!(
                 packed_nibbles.len(),
                 bytes.len() * 2,
-                "Test case {}: Expected length to be 2x byte length",
-                test_idx
+                "Test case {test_idx}: Expected length to be 2x byte length",
             );
 
             // Compare each nibble individually
