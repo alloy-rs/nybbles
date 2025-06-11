@@ -535,26 +535,22 @@ impl Nibbles {
     }
 
     /// Returns `true` if this nibble sequence starts with the given prefix.
-    pub const fn starts_with(&self, other: &Self) -> bool {
-        // If other is empty, it's a prefix of any sequence
-        if other.is_empty() {
-            return true;
-        }
-
-        // If other is longer than self, it can't be a prefix
+    #[inline(always)]
+    pub fn starts_with(&self, other: &Self) -> bool {
+        // Fast path: if lengths don't allow prefix, return false
         if other.len() > self.len() {
             return false;
         }
 
-        let mut i = 0;
-        while i < other.len() {
-            if self.get_unchecked(i) != other.get_unchecked(i) {
-                return false;
-            }
-            i += 1;
+        // Fast path: empty prefix always matches
+        if other.is_empty() {
+            return true;
         }
 
-        true
+        // Direct comparison using masks
+        // SAFETY: We know other.len() is valid index into SLICE_MASKS
+        let mask = unsafe { *SLICE_MASKS.get_unchecked(other.len()) };
+        (self.nibbles & mask) == (other.nibbles & mask)
     }
 
     /// Returns `true` if this nibble sequence ends with the given prefix.
