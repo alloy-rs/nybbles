@@ -632,19 +632,16 @@ impl Nibbles {
 
     /// Returns the first nibble of this nibble sequence.
     pub fn first(&self) -> Option<u8> {
-        if self.length == 0 {
-            None
-        } else {
-            Some(self.get_unchecked(0))
-        }
+        self.get(0)
     }
 
     /// Returns the last nibble of this nibble sequence.
     pub fn last(&self) -> Option<u8> {
-        if self.length == 0 {
+        let len = self.len();
+        if len == 0 {
             None
         } else {
-            Some(self.get_unchecked(self.length as usize - 1))
+            Some(self.get_unchecked(len - 1))
         }
     }
 
