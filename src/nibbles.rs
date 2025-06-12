@@ -863,8 +863,8 @@ impl Nibbles {
 
         // Clear the nibble using a more efficient mask creation
         // Instead of U256::from(0xF_u8) << shift, we can create the mask directly
-        let mask_limb_idx = shift / NIBBLES;
-        let mask_shift = shift % NIBBLES;
+        let mask_limb_idx = shift / 64;
+        let mask_shift = shift % 64;
 
         if mask_limb_idx < 4 {
             // SAFETY: We know the limb index is valid
