@@ -479,8 +479,8 @@ impl Nibbles {
     /// assert_eq!(nibbles.get_byte(2), Some(0xCD));
     /// assert_eq!(nibbles.get_byte(3), None);
     /// ```
-    pub const fn get_byte(&self, i: usize) -> Option<u8> {
-        if likely((i < usize::MAX) & (i.wrapping_add(1) < self.len())) {
+    pub fn get_byte(&self, i: usize) -> Option<u8> {
+        if likely((i < usize::MAX) & self.check_index(i.wrapping_add(1))) {
             Some(self.get_byte_unchecked(i))
         } else {
             None
@@ -505,7 +505,8 @@ impl Nibbles {
     ///     assert_eq!(nibbles.get_byte_unchecked(2), 0xCD);
     /// }
     /// ```
-    pub const fn get_byte_unchecked(&self, i: usize) -> u8 {
+    pub fn get_byte_unchecked(&self, i: usize) -> u8 {
+        self.assert_index(i);
         if i % 2 == 0 {
             self.nibbles.as_le_slice()[U256::BYTES - i / 2 - 1]
         } else {
@@ -551,7 +552,7 @@ impl Nibbles {
     }
 
     /// Returns `true` if this nibble sequence ends with the given prefix.
-    pub const fn ends_with(&self, other: &Self) -> bool {
+    pub fn ends_with(&self, other: &Self) -> bool {
         // If other is empty, it's a prefix of any sequence
         if other.is_empty() {
             return true;
@@ -575,9 +576,11 @@ impl Nibbles {
 
     /// Returns the nibble at the given index.
     pub fn get(&self, i: usize) -> Option<u8> {
-        let byte_index = U256::BYTES.checked_sub(i / 2)?.checked_sub(1)?;
-        let byte = self.nibbles.as_le_slice().get(byte_index)?;
-        Some(if i % 2 == 0 { byte >> 4 } else { byte & 0x0F })
+        if self.check_index(i) {
+            Some(self.get_unchecked(i))
+        } else {
+            None
+        }
     }
 
     /// Returns the nibble at the given index.
@@ -587,7 +590,8 @@ impl Nibbles {
     /// Panics if the index is out of bounds.
     #[inline]
     #[track_caller]
-    pub const fn get_unchecked(&self, i: usize) -> u8 {
+    pub fn get_unchecked(&self, i: usize) -> u8 {
+        self.assert_index(i);
         let byte = self.nibbles.as_le_slice()[U256::BYTES - i / 2 - 1];
         if i % 2 == 0 {
             byte >> 4
@@ -604,7 +608,7 @@ impl Nibbles {
     #[inline]
     #[track_caller]
     pub fn set_at(&mut self, i: usize, value: u8) {
-        assert!(i < self.length as usize && value <= 0xf);
+        assert!(self.check_index(i) && value <= 0xf);
         // SAFETY: index is checked above
         unsafe { self.set_at_unchecked(i, value) };
     }
@@ -627,7 +631,7 @@ impl Nibbles {
     }
 
     /// Returns the first nibble of this nibble sequence.
-    pub const fn first(&self) -> Option<u8> {
+    pub fn first(&self) -> Option<u8> {
         if self.length == 0 {
             None
         } else {
@@ -636,7 +640,7 @@ impl Nibbles {
     }
 
     /// Returns the last nibble of this nibble sequence.
-    pub const fn last(&self) -> Option<u8> {
+    pub fn last(&self) -> Option<u8> {
         if self.length == 0 {
             None
         } else {
@@ -917,6 +921,19 @@ impl Nibbles {
     pub fn clear(&mut self) {
         *self = Self::new();
     }
+
+    #[inline]
+    fn check_index(&self, i: usize) -> bool {
+        i < self.len()
+    }
+
+    #[inline]
+    fn assert_index(&self, i: usize) {
+        let len = self.len();
+        if i >= len {
+            panic_invalid_index(len, i);
+        }
+    }
 }
 
 /// Packs the nibbles into the given slice without checking its length.
@@ -983,9 +1000,17 @@ fn valid_nibbles(nibbles: &[u8]) -> bool {
 }
 
 #[cold]
-#[track_caller]
+#[inline(never)]
+#[cfg_attr(debug_assertions, track_caller)]
 const fn panic_invalid_nibbles() -> ! {
     panic!("attempted to create invalid nibbles");
+}
+
+#[cold]
+#[inline(never)]
+#[cfg_attr(debug_assertions, track_caller)]
+fn panic_invalid_index(len: usize, i: usize) -> ! {
+    panic!("index out of bounds: {i} for nibbles of length {len}");
 }
 
 #[cfg(test)]
