@@ -516,14 +516,13 @@ impl Nibbles {
     /// Increments the nibble sequence by one.
     #[inline]
     pub fn increment(&self) -> Option<Self> {
-        let mask = SLICE_MASKS[self.len()];
-        if self.nibbles == mask {
+        if self.nibbles == SLICE_MASKS[self.len()] {
             return None;
         }
 
         let mut incremented = *self;
         let add = INCREMENT_MASKS[self.len()];
-        incremented.nibbles = (incremented.nibbles + add) & mask;
+        incremented.nibbles += add;
         Some(incremented)
     }
 
