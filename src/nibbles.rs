@@ -39,6 +39,25 @@ static SLICE_MASKS: [U256; 65] = {
     masks
 };
 
+/// This array contains 65 bitmasks used in [`Nibbles::ends_with`].
+///
+/// Each mask is a [`U256`] where:
+/// - Index 0 is just 0 (no bits set)
+/// - Index 1 has the lowest 4 bits set (one nibble)
+/// - Index 2 has the lowest 8 bits set (two nibbles)
+/// - ...and so on
+/// - Index 64 has all bits set ([`U256::MAX`])
+static ENDS_WITH_MASKS: [U256; 65] = {
+    let mut masks = [U256::ZERO; 65];
+    let mut i = 0;
+    while i <= NIBBLES {
+        masks[i] =
+            if i == 0 { U256::ZERO } else { U256::MAX.wrapping_shl((NIBBLES - i) * 4).not() };
+        i += 1;
+    }
+    masks
+};
+
 /// This array contains 65 increment masks used in [`Nibbles::increment`].
 ///
 /// Each mask is a [`U256`] equal to `1 << ((64 - i) * 4)`.
@@ -536,14 +555,14 @@ impl Nibbles {
 
     /// Returns `true` if this nibble sequence starts with the given prefix.
     pub fn starts_with(&self, other: &Self) -> bool {
-        // Fast path: if lengths don't allow prefix, return false
-        if other.len() > self.len() {
-            return false;
-        }
-
         // Fast path: empty prefix always matches
         if other.is_empty() {
             return true;
+        }
+
+        // Fast path: if lengths don't allow prefix, return false
+        if self.len() < other.len() {
+            return false;
         }
 
         // Direct comparison using masks
@@ -552,26 +571,19 @@ impl Nibbles {
     }
 
     /// Returns `true` if this nibble sequence ends with the given prefix.
-    pub const fn ends_with(&self, other: &Self) -> bool {
+    pub fn ends_with(&self, other: &Self) -> bool {
         // If other is empty, it's a prefix of any sequence
         if other.is_empty() {
             return true;
         }
 
-        // If other is longer than self, it can't be a prefix
-        if other.len() > self.len() {
+        // If other is longer than self, it can't be a suffix
+        if self.len() < other.len() {
             return false;
         }
 
-        let mut i = 0;
-        while i < other.len() {
-            if self.get_unchecked(self.len() - i - 1) != other.get_unchecked(other.len() - i - 1) {
-                return false;
-            }
-            i += 1;
-        }
-
-        true
+        let mask = SLICE_MASKS[self.len()];
+        ((self.nibbles & mask) << ((self.len() - other.len()) * 4)) == other.nibbles
     }
 
     /// Returns the nibble at the given index.
@@ -895,6 +907,7 @@ impl Nibbles {
         }
 
         let len_bytes = other.len();
+        // `other` is big endian
         let mut other = U256::from_be_slice(other);
         if len_bytes > 0 {
             other = other.wrapping_shl((U256::BYTES - len_bytes) * 8);
@@ -1176,6 +1189,43 @@ mod tests {
         let odd_nibbles = Nibbles::from_nibbles([1, 2, 3]);
         let even_prefix = Nibbles::from_nibbles([1, 2]);
         assert!(odd_nibbles.starts_with(&even_prefix));
+    }
+
+    #[test]
+    fn ends_with() {
+        let nibbles = Nibbles::from_nibbles([1, 2, 3, 4]);
+
+        // Test empty nibbles
+        let empty = Nibbles::default();
+        assert!(nibbles.ends_with(&empty));
+        assert!(empty.ends_with(&empty));
+        assert!(!empty.ends_with(&nibbles));
+
+        // Test with same nibbles
+        assert!(nibbles.ends_with(&nibbles));
+
+        // Test with suffix
+        let suffix = Nibbles::from_nibbles([3, 4]);
+        assert!(nibbles.ends_with(&suffix));
+        assert!(!suffix.ends_with(&nibbles));
+
+        // Test with different last nibble
+        let different = Nibbles::from_nibbles([1, 2, 3, 5]);
+        assert!(!nibbles.ends_with(&different));
+
+        // Test with longer sequence
+        let longer = Nibbles::from_nibbles([0, 1, 2, 3, 4]);
+        assert!(!nibbles.ends_with(&longer));
+
+        // Test with even nibbles and odd prefix
+        let even_nibbles = Nibbles::from_nibbles([1, 2, 3, 4]);
+        let odd_prefix = Nibbles::from_nibbles([2, 3, 4]);
+        assert!(even_nibbles.ends_with(&odd_prefix));
+
+        // Test with odd nibbles and even prefix
+        let odd_nibbles = Nibbles::from_nibbles([1, 2, 3]);
+        let even_prefix = Nibbles::from_nibbles([2, 3]);
+        assert!(odd_nibbles.ends_with(&even_prefix));
     }
 
     #[test]
