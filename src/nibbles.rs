@@ -29,7 +29,7 @@ const NIBBLES: usize = 64;
 /// - Index 2 has the highest 8 bits set (two nibbles)
 /// - ...and so on
 /// - Index 64 has all bits set ([`U256::MAX`])
-const SLICE_MASKS: [U256; 65] = {
+static SLICE_MASKS: [U256; 65] = {
     let mut masks = [U256::ZERO; 65];
     let mut i = 0;
     while i <= NIBBLES {
@@ -42,7 +42,7 @@ const SLICE_MASKS: [U256; 65] = {
 /// This array contains 65 increment masks used in [`Nibbles::increment`].
 ///
 /// Each mask is a [`U256`] equal to `1 << ((64 - i) * 4)`.
-const INCREMENT_MASKS: [U256; 65] = {
+static INCREMENT_MASKS: [U256; 65] = {
     let mut masks = [U256::ZERO; 65];
     let mut i = 0;
     while i <= NIBBLES {
@@ -586,6 +586,8 @@ impl Nibbles {
     /// # Panics
     ///
     /// Panics if the index is out of bounds.
+    #[inline]
+    #[track_caller]
     pub const fn get_unchecked(&self, i: usize) -> u8 {
         let byte = self.nibbles.as_le_slice()[U256::BYTES - i / 2 - 1];
         if i % 2 == 0 {
@@ -614,7 +616,6 @@ impl Nibbles {
     ///
     /// The caller must ensure that the index is within bounds.
     #[inline]
-    #[track_caller]
     pub unsafe fn set_at_unchecked(&mut self, i: usize, value: u8) {
         let byte_index = U256::BYTES - i / 2 - 1;
         // SAFETY: index checked above
@@ -712,7 +713,9 @@ impl Nibbles {
     /// Returns the total number of nibbles in this [`Nibbles`].
     #[inline]
     pub const fn len(&self) -> usize {
-        self.length as usize
+        let len = self.length as usize;
+        unsafe { std::hint::assert_unchecked(len <= 64) };
+        len
     }
 
     /// Returns a mutable reference to the underlying [`U256`].
