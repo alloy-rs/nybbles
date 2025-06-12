@@ -535,7 +535,7 @@ impl Nibbles {
     }
 
     /// Returns `true` if this nibble sequence starts with the given prefix.
-    pub const fn starts_with(&self, other: &Self) -> bool {
+    pub fn starts_with(&self, other: &Self) -> bool {
         // Fast path: if lengths don't allow prefix, return false
         if other.len() > self.len() {
             return false;
@@ -548,7 +548,7 @@ impl Nibbles {
 
         // Direct comparison using masks
         let mask = SLICE_MASKS[other.len()];
-        self.nibbles.bitand(mask).const_eq(&other.nibbles.bitand(mask))
+        (self.nibbles & mask) == other.nibbles
     }
 
     /// Returns `true` if this nibble sequence ends with the given prefix.
