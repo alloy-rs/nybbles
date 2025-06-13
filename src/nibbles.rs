@@ -535,6 +535,13 @@ impl Nibbles {
             return false;
         }
 
+        // Fast path for even-even and odd-odd sequences
+        if self.len() % 2 == other.len() % 2 {
+            return self.nibbles.as_le_slice()
+                [(NIBBLES - self.len()) / 2..(NIBBLES - self.len() + other.len()) / 2]
+                == other.nibbles.as_le_slice()[(NIBBLES - other.len()) / 2..];
+        }
+
         let mut i = 0;
         while i < other.len() {
             if self.get_unchecked(self.len() - i - 1) != other.get_unchecked(other.len() - i - 1) {
@@ -1167,6 +1174,43 @@ mod tests {
         let odd_nibbles = Nibbles::from_nibbles([1, 2, 3]);
         let even_prefix = Nibbles::from_nibbles([1, 2]);
         assert!(odd_nibbles.starts_with(&even_prefix));
+    }
+
+    #[test]
+    fn ends_with() {
+        let nibbles = Nibbles::from_nibbles([1, 2, 3, 4]);
+
+        // Test empty nibbles
+        let empty = Nibbles::default();
+        assert!(nibbles.ends_with(&empty));
+        assert!(empty.ends_with(&empty));
+        assert!(!empty.ends_with(&nibbles));
+
+        // Test with same nibbles
+        assert!(nibbles.ends_with(&nibbles));
+
+        // Test with suffix
+        let suffix = Nibbles::from_nibbles([3, 4]);
+        assert!(nibbles.ends_with(&suffix));
+        assert!(!suffix.ends_with(&nibbles));
+
+        // Test with different last nibble
+        let different = Nibbles::from_nibbles([2, 3, 5]);
+        assert!(!nibbles.ends_with(&different));
+
+        // Test with longer sequence
+        let longer = Nibbles::from_nibbles([2, 3, 4, 5, 6]);
+        assert!(!nibbles.ends_with(&longer));
+
+        // Test with even nibbles and odd suffix
+        let even_nibbles = Nibbles::from_nibbles([1, 2, 3, 4]);
+        let odd_suffix = Nibbles::from_nibbles([2, 3, 4]);
+        assert!(even_nibbles.ends_with(&odd_suffix));
+
+        // Test with odd nibbles and even suffix
+        let odd_nibbles = Nibbles::from_nibbles([1, 2, 3]);
+        let even_suffix = Nibbles::from_nibbles([2, 3]);
+        assert!(odd_nibbles.ends_with(&even_suffix));
     }
 
     #[test]
