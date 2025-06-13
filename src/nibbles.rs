@@ -809,8 +809,8 @@ impl Nibbles {
         }
 
         let bit_pos = (NIBBLES - self.len() - 1) * 4;
-        let limb_idx = bit_pos / NIBBLES;
-        let shift_in_limb = bit_pos % NIBBLES;
+        let limb_idx = bit_pos / 64;
+        let shift_in_limb = bit_pos % 64;
 
         // SAFETY: limb_idx is always valid because bit_pos < 256
         unsafe {
