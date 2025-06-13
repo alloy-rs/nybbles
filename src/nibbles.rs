@@ -194,7 +194,20 @@ impl Nibbles {
         Self { length: 0, nibbles: U256::ZERO }
     }
 
-    /// Same as [`FromIterator`] implementation, but skips the validity check.
+    /// Creates a new [`Nibbles`] instance from the given iterator over nibbles, without checking
+    /// their validity.
+    ///
+    /// Note that only the low nibble of every byte will be stored as a nibble, i.e. for `0x12` we
+    /// will store a nibble `2`.
+    ///
+    /// For checked version, use the [`FromIterator`] implementation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::from_iter_unchecked([0x0A, 0x0B, 0x0C, 0x0D]);
+    /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     pub fn from_iter_unchecked<I>(iter: I) -> Self
     where
         I: IntoIterator<Item = u8>,
@@ -206,7 +219,7 @@ impl Nibbles {
         packed
     }
 
-    /// Creates a new [`Nibbles`] instance by copying the given bytes.
+    /// Creates a new [`Nibbles`] instance from the given nibbles.
     ///
     /// # Panics
     ///
@@ -234,13 +247,12 @@ impl Nibbles {
         Self::from_iter_unchecked(bytes.iter().copied())
     }
 
-    /// Creates a new [`Nibbles`] instance by copying the given bytes, without checking their
-    /// validity.
+    /// Creates a new [`Nibbles`] instance from the given nibbles.
     ///
-    /// This will not unpack the bytes into nibbles, and will instead store the bytes as-is.
+    /// Note that only the low nibble of every byte will be stored as a nibble, i.e. for `0x12` we
+    /// will store a nibble `2`.
     ///
-    /// Note that it is possible to create a [`Nibbles`] instance with invalid nibble values (i.e.
-    /// values greater than 0xf) using this method. See [the type docs](Self) for more details.
+    /// For checked version, use [`Nibbles::from_nibbles`].
     ///
     /// # Examples
     ///
@@ -248,63 +260,18 @@ impl Nibbles {
     /// # use nybbles::Nibbles;
     /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x0A, 0x0B, 0x0C, 0x0D]);
     /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
+    /// ```
     ///
-    /// // Invalid value!
+    /// Invalid values will not cause panics:
+    ///
+    /// ```
+    /// # use nybbles::Nibbles;
     /// let nibbles = Nibbles::from_nibbles_unchecked(&[0xFF]);
     /// assert_eq!(nibbles.to_vec(), vec![0x0F]);
     /// ```
     #[inline]
     pub fn from_nibbles_unchecked<T: AsRef<[u8]>>(nibbles: T) -> Self {
         Self::from_iter_unchecked(nibbles.as_ref().iter().copied())
-    }
-
-    /// Creates a new [`Nibbles`] instance from a byte vector, without checking its validity.
-    ///
-    /// This will not unpack the bytes into nibbles, and will instead store the bytes as-is.
-    ///
-    /// Note that it is possible to create a [`Nibbles`] instance with invalid nibble values (i.e.
-    /// values greater than 0xf) using this method. See [the type docs](Self) for more details.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use nybbles::Nibbles;
-    /// let nibbles = Nibbles::from_vec_unchecked(vec![0x0A, 0x0B, 0x0C, 0x0D]);
-    /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
-    /// ```
-    ///
-    /// Invalid values will cause panics:
-    ///
-    /// ```should_panic
-    /// # use nybbles::Nibbles;
-    /// let nibbles = Nibbles::from_vec(vec![0xFF]);
-    /// ```
-    #[inline]
-    #[track_caller]
-    pub fn from_vec(vec: Vec<u8>) -> Self {
-        check_nibbles(&vec);
-        Self::from_vec_unchecked(vec)
-    }
-
-    /// Creates a new [`Nibbles`] instance from a byte vector, without checking its validity.
-    ///
-    /// Note that it is possible to create a [`Nibbles`] instance with invalid nibble values (i.e.
-    /// values greater than 0xf) using this method. See [the type docs](Self) for more details.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use nybbles::Nibbles;
-    /// let nibbles = Nibbles::from_vec_unchecked(vec![0x0A, 0x0B, 0x0C, 0x0D]);
-    /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
-    ///
-    /// // Invalid value!
-    /// let nibbles = Nibbles::from_vec_unchecked(vec![0xFF]);
-    /// assert_eq!(nibbles.to_vec(), vec![0x0F]);
-    /// ```
-    #[inline]
-    pub fn from_vec_unchecked(vec: Vec<u8>) -> Self {
-        Self::from_nibbles_unchecked(vec)
     }
 
     /// Converts a byte slice into a [`Nibbles`] instance containing the nibbles (half-bytes or 4
@@ -321,7 +288,13 @@ impl Nibbles {
     /// let nibbles = Nibbles::unpack(&[0xAB, 0xCD]);
     /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     /// ```
+    ///
+    /// ```should_panic
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::unpack(&[0xAB; 33]);
+    /// ```
     #[inline]
+    #[track_caller]
     pub fn unpack(data: &[u8]) -> Self {
         assert!(data.len() <= U256::BYTES);
         // SAFETY: we checked that the length is less than or equal to the size of U256
@@ -369,6 +342,7 @@ impl Nibbles {
     ///
     /// This method combines each pair of consecutive nibbles into a single byte,
     /// effectively reducing the size of the data by a factor of two.
+    ///
     /// If the number of nibbles is odd, the last nibble is shifted left by 4 bits and
     /// added to the packed byte vector.
     ///
@@ -376,8 +350,8 @@ impl Nibbles {
     ///
     /// ```
     /// # use nybbles::Nibbles;
-    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
-    /// assert_eq!(nibbles.pack()[..], [0xAB, 0xCD]);
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C]);
+    /// assert_eq!(nibbles.pack()[..], [0xAB, 0xC0]);
     /// ```
     #[inline]
     pub fn pack(&self) -> SmallVec<[u8; 32]> {
@@ -397,10 +371,10 @@ impl Nibbles {
     ///
     /// ```
     /// # use nybbles::Nibbles;
-    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C]);
     /// let mut packed = [0; 2];
     /// nibbles.pack_to(&mut packed);
-    /// assert_eq!(packed[..], [0xAB, 0xCD]);
+    /// assert_eq!(packed[..], [0xAB, 0xC0]);
     /// ```
     #[inline]
     #[track_caller]
@@ -436,6 +410,8 @@ impl Nibbles {
 
     /// Packs the nibbles into the given slice without checking its length.
     ///
+    /// See [`pack`](Self::pack) for more information.
+    ///
     /// # Safety
     ///
     /// `out` must be valid for at least `(self.len() + 1) / 2` bytes.
@@ -445,6 +421,14 @@ impl Nibbles {
     }
 
     /// Converts the nibbles into a vector of nibbles.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
+    /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
+    /// ```
     pub fn to_vec(&self) -> Vec<u8> {
         let mut nibbles = Vec::with_capacity(self.len());
         for i in 0..self.len() {
@@ -563,6 +547,7 @@ impl Nibbles {
     }
 
     /// Returns the nibble at the given index.
+    #[inline]
     pub fn get(&self, i: usize) -> Option<u8> {
         if self.check_index(i) {
             Some(self.get_unchecked(i))
@@ -619,11 +604,13 @@ impl Nibbles {
     }
 
     /// Returns the first nibble of this nibble sequence.
+    #[inline]
     pub fn first(&self) -> Option<u8> {
         self.get(0)
     }
 
     /// Returns the last nibble of this nibble sequence.
+    #[inline]
     pub fn last(&self) -> Option<u8> {
         let len = self.len();
         if len == 0 {

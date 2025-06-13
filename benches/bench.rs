@@ -314,22 +314,6 @@ pub fn bench_pop(c: &mut Criterion) {
     group.finish();
 }
 
-pub fn bench_from_vec_unchecked(c: &mut Criterion) {
-    let mut group = c.benchmark_group("from_vec_unchecked");
-
-    for size in SIZE_NIBBLES {
-        let nibbles_vec = generate_nibbles(size);
-
-        group.throughput(Throughput::Elements(size as u64));
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles_vec, |b, data| {
-            b.iter(|| Nibbles::from_vec_unchecked(black_box(data.clone())))
-        });
-    }
-
-    group.finish();
-}
-
 pub fn bench_first(c: &mut Criterion) {
     let mut group = c.benchmark_group("first");
 
@@ -517,9 +501,8 @@ criterion_group!(
         .noise_threshold(0.20);
     targets = bench_from_nibbles, bench_pack, bench_unpack, bench_push, bench_slice,
               bench_join, bench_extend, bench_set_at, bench_get_byte, bench_common_prefix_length,
-              bench_cmp, bench_clone, bench_increment, bench_pop, bench_from_vec_unchecked, bench_first,
-              bench_last, bench_starts_with, bench_ends_with, bench_truncate, bench_clear,
-              nibbles_benchmark
+              bench_cmp, bench_clone, bench_increment, bench_pop, bench_first, bench_last,
+              bench_starts_with, bench_ends_with, bench_truncate, bench_clear, nibbles_benchmark
 );
 criterion_main!(benches);
 
