@@ -25,7 +25,7 @@ jobs:
             i686-unknown-linux-gnu,
             x86_64-unknown-linux-gnu,
           ]
-        rust: [nightly, stable, "1.73"] # MSRV
+        rust: [nightly, stable, "1.81"] # MSRV
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -45,12 +45,12 @@ jobs:
 
       - run: cargo build
       - run: cargo test
-        if: matrix.rust != '1.73' # MSRV
+        if: matrix.rust != '1.81' # MSRV
       - run: cargo build --no-default-features
       - run: cargo test --no-default-features
-        if: matrix.rust != '1.73' # MSRV
+        if: matrix.rust != '1.81' # MSRV
       - run: cargo test
-        if: matrix.rust != '1.73' # MSRV
+        if: matrix.rust != '1.81' # MSRV
       - run: cargo test --all-features
         if: matrix.rust == 'nightly'
 
