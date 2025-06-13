@@ -721,7 +721,7 @@ impl Nibbles {
     /// This method does not verify that the provided range is valid for this nibble sequence.
     /// The caller must ensure that `start <= end` and `end <= self.len()`.
     #[inline]
-    pub const fn slice_unchecked(&self, start: usize, end: usize) -> Self {
+    pub fn slice_unchecked(&self, start: usize, end: usize) -> Self {
         // Fast path for empty slice
         if end == 0 || end <= start {
             return Self::new();
