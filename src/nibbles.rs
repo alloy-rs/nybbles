@@ -523,14 +523,14 @@ impl Nibbles {
         (self.nibbles & mask) == other.nibbles
     }
 
-    /// Returns `true` if this nibble sequence ends with the given prefix.
+    /// Returns `true` if this nibble sequence ends with the given suffix.
     pub fn ends_with(&self, other: &Self) -> bool {
-        // If other is empty, it's a prefix of any sequence
+        // If other is empty, it's a suffix of any sequence
         if other.is_empty() {
             return true;
         }
 
-        // If other is longer than self, it can't be a prefix
+        // If other is longer than self, it can't be a suffix
         if other.len() > self.len() {
             return false;
         }
