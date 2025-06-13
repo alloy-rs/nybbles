@@ -2,7 +2,7 @@ use core::{
     cmp::{self, Ordering},
     fmt,
     mem::MaybeUninit,
-    ops::{Bound, Index, RangeBounds},
+    ops::{Bound, RangeBounds},
     slice,
 };
 use ruint::aliases::U256;
@@ -39,10 +39,10 @@ static SLICE_MASKS: [U256; 65] = {
     masks
 };
 
-/// This array contains 65 increment masks used in [`Nibbles::increment`].
+/// This array contains 65 values to add that are used in [`Nibbles::increment`].
 ///
-/// Each mask is a [`U256`] equal to `1 << ((64 - i) * 4)`.
-static INCREMENT_MASKS: [U256; 65] = {
+/// Each value is a [`U256`] equal to `1 << ((64 - i) * 4)`.
+static INCREMENT_VALUES: [U256; 65] = {
     let mut masks = [U256::ZERO; 65];
     let mut i = 0;
     while i <= NIBBLES {
@@ -87,7 +87,7 @@ pub struct Nibbles {
     /// Nibbles length.
     // This field goes first, because the derived implementation of `PartialEq` compares the fields
     // in order, so we can short-circuit the comparison if the `length` field differs.
-    pub(crate) length: u8,
+    pub(crate) length: usize,
     /// The nibbles themselves, stored as a 256-bit unsigned integer with most significant bits set
     /// first.
     pub(crate) nibbles: U256,
@@ -137,19 +137,6 @@ impl PartialOrd for Nibbles {
     }
 }
 
-impl Index<usize> for Nibbles {
-    type Output = u8;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        /// List of possible nibbles to return static references. It's a hack that allows us to
-        /// return a reference to a nibble, even though we cannot address nibbles directly and must
-        /// go through bytes first.
-        static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-
-        &NIBBLES[self.get_unchecked(index) as usize]
-    }
-}
-
 impl FromIterator<u8> for Nibbles {
     fn from_iter<T: IntoIterator<Item = u8>>(iter: T) -> Self {
         let mut nibbles = Self::default();
@@ -172,7 +159,7 @@ impl alloy_rlp::Encodable for Nibbles {
 
     #[inline]
     fn length(&self) -> usize {
-        let payload_length = self.length as usize;
+        let payload_length = self.len();
         payload_length + alloy_rlp::length_of_length(payload_length)
     }
 }
@@ -335,8 +322,8 @@ impl Nibbles {
     /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     /// ```
     #[inline]
-    pub fn unpack<T: AsRef<[u8]>>(data: T) -> Self {
-        assert!(data.as_ref().len() <= U256::BYTES);
+    pub fn unpack(data: &[u8]) -> Self {
+        assert!(data.len() <= U256::BYTES);
         // SAFETY: we checked that the length is less than or equal to the size of U256
         unsafe { Self::unpack_unchecked(data) }
     }
@@ -357,10 +344,9 @@ impl Nibbles {
     /// let nibbles = unsafe { Nibbles::unpack_unchecked(&[0xAB, 0xCD]) };
     /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     /// ```
-    pub unsafe fn unpack_unchecked<T: AsRef<[u8]>>(data: T) -> Self {
-        let data = data.as_ref();
-        let length = (data.len() * 2) as u8;
-        debug_assert!(length as usize <= NIBBLES);
+    pub unsafe fn unpack_unchecked(data: &[u8]) -> Self {
+        let length = data.len() * 2;
+        debug_assert!(length <= NIBBLES);
 
         let mut nibbles = U256::ZERO;
 
@@ -505,6 +491,8 @@ impl Nibbles {
     ///     assert_eq!(nibbles.get_byte_unchecked(2), 0xCD);
     /// }
     /// ```
+    #[inline]
+    #[track_caller]
     pub fn get_byte_unchecked(&self, i: usize) -> u8 {
         self.assert_index(i);
         if i % 2 == 0 {
@@ -517,12 +505,12 @@ impl Nibbles {
     /// Increments the nibble sequence by one.
     #[inline]
     pub fn increment(&self) -> Option<Self> {
-        if self.nibbles == SLICE_MASKS[self.len()] {
+        if self.is_empty() || self.nibbles == SLICE_MASKS[self.len()] {
             return None;
         }
 
         let mut incremented = *self;
-        let add = INCREMENT_MASKS[self.len()];
+        let add = INCREMENT_VALUES[self.len()];
         incremented.nibbles += add;
         Some(incremented)
     }
@@ -632,7 +620,7 @@ impl Nibbles {
 
     /// Returns the first nibble of this nibble sequence.
     pub fn first(&self) -> Option<u8> {
-        if self.length == 0 {
+        if self.is_empty() {
             None
         } else {
             Some(self.get_unchecked(0))
@@ -641,10 +629,10 @@ impl Nibbles {
 
     /// Returns the last nibble of this nibble sequence.
     pub fn last(&self) -> Option<u8> {
-        if self.length == 0 {
+        if self.is_empty() {
             None
         } else {
-            Some(self.get_unchecked(self.length as usize - 1))
+            Some(self.get_unchecked(self.len() - 1))
         }
     }
 
@@ -674,7 +662,7 @@ impl Nibbles {
 
             // Create mask for the nibbles we care about
             let mask = u64::MAX << ((16 - min_nibble_len) * 4);
-            let xor = (self_limb & mask) ^ (other_limb & mask);
+            let xor = (self_limb ^ other_limb) & mask;
 
             if xor == 0 {
                 return min_nibble_len;
@@ -689,9 +677,7 @@ impl Nibbles {
         } else {
             // For other lengths, mask the nibbles we care about, and then XOR
             let mask = SLICE_MASKS[min_nibble_len];
-            let masked_self = self.nibbles & mask;
-            let masked_other = other.nibbles & mask;
-            masked_self ^ masked_other
+            (self.nibbles ^ other.nibbles) & mask
         };
 
         if xor == U256::ZERO {
@@ -704,19 +690,19 @@ impl Nibbles {
     /// Returns the total number of bits in this [`Nibbles`].
     #[inline]
     const fn bit_len(&self) -> usize {
-        self.length as usize * 4
+        self.len() * 4
     }
 
     /// Returns `true` if this [`Nibbles`] is empty.
     #[inline]
     pub const fn is_empty(&self) -> bool {
-        self.length == 0
+        self.len() == 0
     }
 
     /// Returns the total number of nibbles in this [`Nibbles`].
     #[inline]
     pub const fn len(&self) -> usize {
-        let len = self.length as usize;
+        let len = self.length;
         unsafe { core::hint::assert_unchecked(len <= 64) };
         len
     }
@@ -740,7 +726,7 @@ impl Nibbles {
     #[inline]
     pub const fn slice_unchecked(&self, start: usize, end: usize) -> Self {
         // Fast path for empty slice
-        if start == end {
+        if end == 0 || end <= start {
             return Self::new();
         }
 
@@ -769,7 +755,7 @@ impl Nibbles {
             }
         };
 
-        Self { length: nibble_len as u8, nibbles }
+        Self { length: nibble_len, nibbles }
     }
 
     /// Creates new nibbles containing the nibbles in the specified range.
@@ -800,14 +786,9 @@ impl Nibbles {
 
     /// Join two nibble sequences together.
     #[inline]
-    pub const fn join(&self, other: &Self) -> Self {
+    pub fn join(&self, other: &Self) -> Self {
         let mut new = *self;
-        if other.is_empty() {
-            return new;
-        }
-
-        new.nibbles = new.nibbles.bitor(other.nibbles.wrapping_shr(self.bit_len()));
-        new.length += other.length;
+        new.extend(other);
         new
     }
 
@@ -836,7 +817,7 @@ impl Nibbles {
             return;
         }
 
-        let bit_pos = (NIBBLES - self.length as usize - 1) * 4;
+        let bit_pos = (NIBBLES - self.len() - 1) * 4;
         let limb_idx = bit_pos / NIBBLES;
         let shift_in_limb = bit_pos % NIBBLES;
 
@@ -851,15 +832,15 @@ impl Nibbles {
 
     /// Pops a nibble from the end of the current nibbles.
     pub fn pop(&mut self) -> Option<u8> {
-        if self.length == 0 {
+        if self.is_empty() {
             return None;
         }
 
         // The last nibble is at bit position (64 - length) * 4 from the MSB
-        let shift = (NIBBLES - self.length as usize) * 4;
+        let shift = (NIBBLES - self.len()) * 4;
 
         // Extract the nibble - after shifting right, it's in the lowest bits of limb 0
-        let nibble = ((self.nibbles.wrapping_shr(shift).as_limbs()[0]) & 0xF) as u8;
+        let nibble = (self.nibbles >> shift).as_limbs()[0] as u8 & 0xF;
 
         // Clear the nibble using a more efficient mask creation
         // Instead of U256::from(0xF_u8) << shift, we can create the mask directly
@@ -884,7 +865,7 @@ impl Nibbles {
             return;
         }
 
-        self.nibbles |= other.nibbles.wrapping_shr(self.bit_len());
+        self.nibbles |= other.nibbles >> self.bit_len();
         self.length += other.length;
     }
 
@@ -903,7 +884,7 @@ impl Nibbles {
             other = other.wrapping_shl((U256::BYTES - len_bytes) * 8);
         }
         self.nibbles |= other.wrapping_shr(self.bit_len());
-        self.length += (len_bytes * 2) as u8;
+        self.length += len_bytes * 2;
     }
 
     /// Truncates the current nibbles to the given length.
@@ -922,11 +903,13 @@ impl Nibbles {
         *self = Self::new();
     }
 
+    /// Checks if the given index is within the bounds of the current nibbles.
     #[inline]
-    fn check_index(&self, i: usize) -> bool {
+    const fn check_index(&self, i: usize) -> bool {
         i < self.len()
     }
 
+    /// Panics if the given index is out of bounds of the current nibbles.
     #[inline]
     fn assert_index(&self, i: usize) {
         let len = self.len();
@@ -1118,38 +1101,38 @@ mod tests {
         assert_eq!(nibbles2.cmp(&nibbles1), Ordering::Greater);
 
         // Test with same nibbles
-        let nibbles1 = Nibbles::unpack([0x12, 0x34]);
-        let nibbles2 = Nibbles::unpack([0x12, 0x34]);
+        let nibbles1 = Nibbles::unpack(&[0x12, 0x34]);
+        let nibbles2 = Nibbles::unpack(&[0x12, 0x34]);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Equal);
 
         // Test with different lengths
-        let short = Nibbles::unpack([0x12]);
-        let long = Nibbles::unpack([0x12, 0x34]);
+        let short = Nibbles::unpack(&[0x12]);
+        let long = Nibbles::unpack(&[0x12, 0x34]);
         assert_eq!(short.cmp(&long), Ordering::Less);
 
         // Test with common prefix but different values
-        let nibbles1 = Nibbles::unpack([0x12, 0x34]);
-        let nibbles2 = Nibbles::unpack([0x12, 0x35]);
+        let nibbles1 = Nibbles::unpack(&[0x12, 0x34]);
+        let nibbles2 = Nibbles::unpack(&[0x12, 0x35]);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Less);
 
         // Test with differing first byte
-        let nibbles1 = Nibbles::unpack([0x12, 0x34]);
-        let nibbles2 = Nibbles::unpack([0x13, 0x34]);
+        let nibbles1 = Nibbles::unpack(&[0x12, 0x34]);
+        let nibbles2 = Nibbles::unpack(&[0x13, 0x34]);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Less);
 
         // Test with odd length nibbles
-        let nibbles1 = Nibbles::unpack([0x1]);
-        let nibbles2 = Nibbles::unpack([0x2]);
+        let nibbles1 = Nibbles::unpack(&[0x1]);
+        let nibbles2 = Nibbles::unpack(&[0x2]);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Less);
 
         // Test with odd and even length nibbles
-        let odd = Nibbles::unpack([0x1]);
-        let even = Nibbles::unpack([0x12]);
+        let odd = Nibbles::unpack(&[0x1]);
+        let even = Nibbles::unpack(&[0x12]);
         assert_eq!(odd.cmp(&even), Ordering::Less);
 
         // Test with longer sequences
-        let nibbles1 = Nibbles::unpack([0x12, 0x34, 0x56, 0x78]);
-        let nibbles2 = Nibbles::unpack([0x12, 0x34, 0x56, 0x79]);
+        let nibbles1 = Nibbles::unpack(&[0x12, 0x34, 0x56, 0x78]);
+        let nibbles2 = Nibbles::unpack(&[0x12, 0x34, 0x56, 0x79]);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Less);
 
         let nibbles1 = Nibbles::from_nibbles([0x0, 0x0]);
@@ -1483,19 +1466,19 @@ mod tests {
             for i in 0..packed_nibbles.len() {
                 assert_eq!(
                     packed_nibbles.get_unchecked(i),
-                    nibbles[i],
+                    nibbles.get_unchecked(i),
                     "Test case {}: Nibble at index {} differs for bytes {:?}:
     Nibbles={:?}, Nibbles={:?}",
                     test_idx,
                     i,
                     bytes,
                     packed_nibbles.get_unchecked(i),
-                    nibbles[i]
+                    nibbles.get_unchecked(i)
                 );
             }
         }
 
-        let nibbles = Nibbles::unpack([0xAB, 0xCD]);
+        let nibbles = Nibbles::unpack(&[0xAB, 0xCD]);
         assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     }
 
