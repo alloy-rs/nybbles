@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 1aa21651a2371aed0f77c6c60356ad055cc2d1fee1641d3429c51ded5546f416 # shrinks to valid_nibbles = [], invalid_nibble = 16, position = 0
+cc da60d3a28c53727ed95d22cd8fc3e0ba8ccd89a77cff5733df6cf852ea506262 # shrinks to valid_nibbles = [], invalid_nibble = 16, position = 0
