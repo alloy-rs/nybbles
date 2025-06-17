@@ -38,6 +38,7 @@ proptest = { version = "1.4", default-features = false, optional = true, feature
 [dev-dependencies]
 hex-literal = "1"
 criterion = { version = "2.10", package = "codspeed-criterion-compat" }
+rand = "0.8"
 
 [features]
 default = ["std"]
