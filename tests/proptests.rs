@@ -10,9 +10,7 @@ fn valid_nibbles(nibbles: &[u8]) -> bool {
 // Configuration for basic operations group
 fn basic_ops_config() -> ProptestConfig {
     ProptestConfig {
-        failure_persistence: Some(Box::new(FileFailurePersistence::SourceParallel(
-            "basic_ops".into(),
-        ))),
+        failure_persistence: Some(Box::new(FileFailurePersistence::SourceParallel("basic_ops"))),
         ..ProptestConfig::default()
     }
 }
@@ -20,9 +18,7 @@ fn basic_ops_config() -> ProptestConfig {
 // Configuration for slice/manipulation operations group
 fn slice_ops_config() -> ProptestConfig {
     ProptestConfig {
-        failure_persistence: Some(Box::new(FileFailurePersistence::SourceParallel(
-            "slice_ops".into(),
-        ))),
+        failure_persistence: Some(Box::new(FileFailurePersistence::SourceParallel("slice_ops"))),
         ..ProptestConfig::default()
     }
 }
@@ -30,9 +26,7 @@ fn slice_ops_config() -> ProptestConfig {
 // Configuration for comparison/query operations group
 fn query_ops_config() -> ProptestConfig {
     ProptestConfig {
-        failure_persistence: Some(Box::new(FileFailurePersistence::SourceParallel(
-            "query_ops".into(),
-        ))),
+        failure_persistence: Some(Box::new(FileFailurePersistence::SourceParallel("query_ops"))),
         ..ProptestConfig::default()
     }
 }
