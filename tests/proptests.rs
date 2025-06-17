@@ -1,39 +1,14 @@
 #![cfg(feature = "arbitrary")]
 
 use nybbles::Nibbles;
-use proptest::{collection::vec, prelude::*, test_runner::FileFailurePersistence};
+use proptest::{collection::vec, prelude::*};
 
 fn valid_nibbles(nibbles: &[u8]) -> bool {
     nibbles.iter().all(|&nibble| nibble <= 0xf)
 }
 
-// Configuration for basic operations group
-fn basic_ops_config() -> ProptestConfig {
-    ProptestConfig {
-        failure_persistence: Some(Box::new(FileFailurePersistence::SourceParallel("basic_ops"))),
-        ..ProptestConfig::default()
-    }
-}
-
-// Configuration for slice/manipulation operations group
-fn slice_ops_config() -> ProptestConfig {
-    ProptestConfig {
-        failure_persistence: Some(Box::new(FileFailurePersistence::SourceParallel("slice_ops"))),
-        ..ProptestConfig::default()
-    }
-}
-
-// Configuration for comparison/query operations group
-fn query_ops_config() -> ProptestConfig {
-    ProptestConfig {
-        failure_persistence: Some(Box::new(FileFailurePersistence::SourceParallel("query_ops"))),
-        ..ProptestConfig::default()
-    }
-}
-
 // Basic operations group - creation, conversion, basic manipulation
 proptest! {
-    #![proptest_config(basic_ops_config())]
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
@@ -80,8 +55,13 @@ proptest! {
             prop_assert_eq!(nibbles.get_byte(i), Some(expected));
         }
 
-        // Test out of bounds
-        prop_assert_eq!(nibbles.get_byte(nibbles_data.len()), None);
+        // Test boundary conditions
+        // Last valid index (requires at least 2 nibbles)
+        if nibbles_data.len() >= 2 {
+            prop_assert!(nibbles.get_byte(nibbles_data.len()-2).is_some());
+        }
+        // First invalid index
+        prop_assert_eq!(nibbles.get_byte(nibbles_data.len()-1), None);
     }
 
     #[test]
@@ -145,7 +125,6 @@ proptest! {
 
 // Slice and manipulation operations group
 proptest! {
-    #![proptest_config(slice_ops_config())]
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
@@ -268,7 +247,6 @@ proptest! {
 
 // Query and comparison operations group
 proptest! {
-    #![proptest_config(query_ops_config())]
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
