@@ -539,7 +539,6 @@ pub fn nibbles_benchmark(c: &mut Criterion) {
     }
 }
 
-
 fn generate_bytes_random(len: usize) -> Vec<u8> {
     let mut rng = thread_rng();
     (0..len).map(|_| rng.gen()).collect()
@@ -549,7 +548,6 @@ fn generate_nibbles_random(len: usize) -> Vec<u8> {
     let mut rng = thread_rng();
     (0..len).map(|_| rng.gen_range(0..16)).collect()
 }
-
 
 fn unpack_naive(bytes: &[u8]) -> Vec<u8> {
     bytes.iter().flat_map(|byte| [byte >> 4, byte & 0x0f]).collect()
