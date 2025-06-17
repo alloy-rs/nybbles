@@ -1,16 +1,32 @@
 [package]
 name = "nybbles"
 version = "0.3.4"
-authors = ["DaniPopes <57450786+DaniPopes@users.noreply.github.com>"]
 description = "Efficient nibble-sized (4-bit) byte sequence data structure"
-edition = "2021"
-rust-version = "1.73"
-license = "MIT OR Apache-2.0"
 categories = ["data-structures", "no-std"]
 keywords = ["nibbles", "vector", "ethereum"]
+exclude = [".github/", "deny.toml", "release.toml", "rustfmt.toml"]
+
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[workspace]
+members = [".", "nybbles-bench"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.73"
+authors = ["DaniPopes <57450786+DaniPopes@users.noreply.github.com>"]
+license = "MIT OR Apache-2.0"
 homepage = "https://github.com/alloy-rs/nybbles"
 repository = "https://github.com/alloy-rs/nybbles"
-exclude = [".github/", "deny.toml", "release.toml", "rustfmt.toml"]
+
+[lib]
+bench = false
 
 [dependencies]
 smallvec = { version = "1.0", default-features = false, features = [
@@ -36,6 +52,8 @@ proptest = { version = "1.4", default-features = false, optional = true, feature
 ] }
 
 [dev-dependencies]
+nybbles = { path = ".", features = ["arbitrary"] }
+
 hex-literal = "1"
 criterion = { version = "2.10", package = "codspeed-criterion-compat" }
 
@@ -46,11 +64,6 @@ nightly = ["smallvec/specialization", "smallvec/may_dangle"]
 serde = ["dep:serde", "smallvec/serde"]
 rlp = ["dep:alloy-rlp"]
 arbitrary = ["dep:arbitrary", "dep:proptest", "smallvec/arbitrary", "std"]
-
-[[bench]]
-name = "bench"
-harness = false
-required-features = ["arbitrary"]
 
 # Use the `--profile profiling` flag to show symbols in release mode.
 # e.g. `cargo build --profile profiling`

@@ -28,9 +28,9 @@ jobs:
         with:
           tool: cargo-codspeed
       - name: Build the benchmark target(s)
-        run: cargo codspeed build --profile profiling --features="arbitrary"
+        run: cargo codspeed build --profile profiling -p nybbles-bench bench
       - name: Run the benchmarks
         uses: CodSpeedHQ/action@v3
         with:
-          run: cargo codspeed run --workspace
+          run: cargo codspeed run -p nybbles-bench bench
           token: ${{ secrets.CODSPEED_TOKEN }}
