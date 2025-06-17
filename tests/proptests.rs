@@ -34,11 +34,11 @@ proptest! {
     ) {
         let mut nibbles = Nibbles::from_nibbles(&initial_nibbles);
         let original_len = nibbles.len();
-        
+
         nibbles.push(extra_nibble);
         prop_assert_eq!(nibbles.len(), original_len + 1);
         prop_assert_eq!(nibbles.last(), Some(extra_nibble));
-        
+
         let popped = nibbles.pop();
         prop_assert_eq!(popped, Some(extra_nibble));
         prop_assert_eq!(nibbles.len(), original_len);
@@ -53,7 +53,7 @@ proptest! {
             let expected = (nibbles_data[i] << 4) | nibbles_data[i + 1];
             prop_assert_eq!(nibbles.get_byte(i), Some(expected));
         }
-        
+
         // Test out of bounds
         prop_assert_eq!(nibbles.get_byte(nibbles_data.len()), None);
     }
@@ -62,10 +62,10 @@ proptest! {
     #[cfg_attr(miri, ignore = "no proptest")]
     fn first_last_properties(nibbles_data in vec(0u8..16, 1..64)) {
         let nibbles = Nibbles::from_nibbles(&nibbles_data);
-        
+
         prop_assert_eq!(nibbles.first(), Some(nibbles_data[0]));
         prop_assert_eq!(nibbles.last(), Some(*nibbles_data.last().unwrap()));
-        
+
         // Empty nibbles should return None
         let empty = Nibbles::new();
         prop_assert_eq!(empty.first(), None);
@@ -79,26 +79,26 @@ proptest! {
         new_value in 0u8..16
     ) {
         let len = nibbles_data.len();
-        
+
         // Test setting at first index
         let mut nibbles = Nibbles::from_nibbles(&nibbles_data);
         nibbles.set_at(0, new_value);
         prop_assert_eq!(nibbles[0], new_value);
         prop_assert_eq!(nibbles.len(), len);
-        
+
         // Test setting at last index
         if len > 1 {
             let mut nibbles = Nibbles::from_nibbles(&nibbles_data);
             nibbles.set_at(len - 1, new_value);
             prop_assert_eq!(nibbles[len - 1], new_value);
             prop_assert_eq!(nibbles.len(), len);
-            
-            // Other elements should remain unchanged  
+
+            // Other elements should remain unchanged
             for i in 0..len-1 {
                 prop_assert_eq!(nibbles[i], nibbles_data[i]);
             }
         }
-        
+
         // Test setting at middle index
         if len > 2 {
             let mid = len / 2;
@@ -106,7 +106,7 @@ proptest! {
             nibbles.set_at(mid, new_value);
             prop_assert_eq!(nibbles[mid], new_value);
             prop_assert_eq!(nibbles.len(), len);
-            
+
             // Other elements should remain unchanged
             for (i, &original) in nibbles_data.iter().enumerate() {
                 if i != mid {
@@ -124,29 +124,29 @@ proptest! {
     fn slice_consistency(nibbles_data in vec(0u8..16, 1..64)) {
         let nibbles = Nibbles::from_nibbles(&nibbles_data);
         let len = nibbles_data.len();
-        
+
         // Test specific slice cases to avoid rejection issues
         // Test full slice
         let full_slice = nibbles.slice(..);
         prop_assert_eq!(full_slice.as_slice(), &nibbles_data[..]);
-        
+
         // Test first half
         if len > 1 {
             let mid = len / 2;
             let first_half = nibbles.slice(..mid);
             prop_assert_eq!(first_half.as_slice(), &nibbles_data[..mid]);
-            
+
             // Test second half
             let second_half = nibbles.slice(mid..);
             prop_assert_eq!(second_half.as_slice(), &nibbles_data[mid..]);
-            
+
             // Test middle slice
             if mid + 1 < len {
                 let middle_slice = nibbles.slice(mid..mid+1);
                 prop_assert_eq!(middle_slice.as_slice(), &nibbles_data[mid..mid+1]);
             }
         }
-        
+
         // Test empty slice
         let empty_slice = nibbles.slice(0..0);
         prop_assert_eq!(empty_slice.len(), 0);
@@ -160,9 +160,9 @@ proptest! {
     ) {
         let mut result = Nibbles::from_nibbles(&nibbles1);
         let other = Nibbles::from_nibbles(&nibbles2);
-        
+
         result.extend_from_slice(&other);
-        
+
         let expected: Vec<u8> = nibbles1.into_iter().chain(nibbles2.into_iter()).collect();
         prop_assert_eq!(result.as_slice(), &expected[..]);
     }
@@ -175,9 +175,9 @@ proptest! {
     ) {
         let n1 = Nibbles::from_nibbles(&nibbles1);
         let n2 = Nibbles::from_nibbles(&nibbles2);
-        
+
         let joined = n1.join(&n2);
-        
+
         let expected: Vec<u8> = nibbles1.into_iter().chain(nibbles2.into_iter()).collect();
         prop_assert_eq!(joined.as_slice(), &expected[..]);
         prop_assert_eq!(joined.len(), n1.len() + n2.len());
@@ -187,12 +187,12 @@ proptest! {
     #[cfg_attr(miri, ignore = "no proptest")]
     fn truncate_consistency(nibbles_data in vec(0u8..16, 1..64)) {
         let original_len = nibbles_data.len();
-        
+
         // Test truncating to zero
         let mut nibbles = Nibbles::from_nibbles(&nibbles_data);
         nibbles.truncate(0);
         prop_assert_eq!(nibbles.len(), 0);
-        
+
         // Test truncating to half length
         if original_len > 1 {
             let mut nibbles = Nibbles::from_nibbles(&nibbles_data);
@@ -201,7 +201,7 @@ proptest! {
             prop_assert_eq!(nibbles.len(), new_len);
             prop_assert_eq!(nibbles.as_slice(), &nibbles_data[..new_len]);
         }
-        
+
         // Test truncating to same length (no-op)
         let mut nibbles = Nibbles::from_nibbles(&nibbles_data);
         nibbles.truncate(original_len);
@@ -213,17 +213,17 @@ proptest! {
     #[cfg_attr(miri, ignore = "no proptest")]
     fn increment_properties(nibbles_data in vec(0u8..16, 1..32)) {
         let nibbles = Nibbles::from_nibbles(&nibbles_data);
-        
+
         if let Some(incremented) = nibbles.increment() {
             // Length should remain the same
             prop_assert_eq!(incremented.len(), nibbles.len());
-            
+
             // Should be greater than original (lexicographically)
             prop_assert!(incremented > nibbles);
-            
+
             // Check that it's the minimal increment
             // (this is more complex to verify, so we'll do basic checks)
-            
+
             // If original wasn't all 0xF, then increment should exist
             let all_f = nibbles_data.iter().all(|&x| x == 0xf);
             if !all_f {
@@ -248,23 +248,23 @@ proptest! {
     ) {
         let n1 = Nibbles::from_nibbles(&nibbles1);
         let n2 = Nibbles::from_nibbles(&nibbles2);
-        
+
         let common_len = n1.common_prefix_length(&n2);
-        
+
         // Should be symmetric
         prop_assert_eq!(common_len, n2.common_prefix_length(&n1));
-        
+
         // Should not exceed either length
         prop_assert!(common_len <= n1.len());
         prop_assert!(common_len <= n2.len());
-        
+
         // Verify the common prefix matches
         if common_len > 0 && !nibbles1.is_empty() && !nibbles2.is_empty() {
             for i in 0..common_len {
                 prop_assert_eq!(nibbles1[i], nibbles2[i]);
             }
         }
-        
+
         // If there's a difference, it should be at the position right after common prefix
         if common_len < n1.len() && common_len < n2.len() {
             prop_assert_ne!(nibbles1[common_len], nibbles2[common_len]);
@@ -276,22 +276,22 @@ proptest! {
     fn has_prefix_consistency(nibbles_data in vec(0u8..16, 1..64)) {
         let nibbles = Nibbles::from_nibbles(&nibbles_data);
         let len = nibbles_data.len();
-        
+
         // Test empty prefix
         prop_assert!(nibbles.has_prefix(&[]));
         prop_assert!(nibbles.starts_with(&[]));
-        
+
         // Test full prefix
         prop_assert!(nibbles.has_prefix(&nibbles_data));
         prop_assert!(nibbles.starts_with(&nibbles_data));
-        
+
         // Test first half prefix
         if len > 1 {
             let prefix_len = len / 2;
             let prefix = &nibbles_data[..prefix_len];
             prop_assert!(nibbles.has_prefix(prefix));
             prop_assert!(nibbles.starts_with(prefix));
-            
+
             // Test with different prefix
             if prefix_len > 0 {
                 let mut different_prefix = prefix.to_vec();
@@ -311,15 +311,15 @@ proptest! {
     ) {
         let n1 = Nibbles::from_nibbles(&nibbles1);
         let n2 = Nibbles::from_nibbles(&nibbles2);
-        
+
         // Test ordering consistency with slice comparison
         let slice_cmp = nibbles1.cmp(&nibbles2);
         let nibbles_cmp = n1.cmp(&n2);
         prop_assert_eq!(slice_cmp, nibbles_cmp);
-        
+
         // Test reflexivity
         prop_assert_eq!(n1.cmp(&n1), core::cmp::Ordering::Equal);
-        
+
         // Test antisymmetry
         prop_assert_eq!(n1.cmp(&n2), n2.cmp(&n1).reverse());
     }
