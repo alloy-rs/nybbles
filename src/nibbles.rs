@@ -295,10 +295,10 @@ impl Nibbles {
     /// ```
     #[inline]
     #[track_caller]
-    pub fn unpack(data: &[u8]) -> Self {
-        assert!(data.len() <= U256::BYTES);
+    pub fn unpack(data: impl AsRef<[u8]>) -> Self {
+        assert!(data.as_ref().len() <= U256::BYTES);
         // SAFETY: we checked that the length is less than or equal to the size of U256
-        unsafe { Self::unpack_unchecked(data) }
+        unsafe { Self::unpack_unchecked(data.as_ref()) }
     }
 
     /// Converts a byte slice into a [`Nibbles`] instance containing the nibbles (half-bytes or 4
