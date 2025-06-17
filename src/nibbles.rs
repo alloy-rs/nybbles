@@ -1092,38 +1092,38 @@ mod tests {
         assert_eq!(nibbles2.cmp(&nibbles1), Ordering::Greater);
 
         // Test with same nibbles
-        let nibbles1 = Nibbles::unpack(&[0x12, 0x34]);
-        let nibbles2 = Nibbles::unpack(&[0x12, 0x34]);
+        let nibbles1 = Nibbles::unpack([0x12, 0x34]);
+        let nibbles2 = Nibbles::unpack([0x12, 0x34]);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Equal);
 
         // Test with different lengths
-        let short = Nibbles::unpack(&[0x12]);
-        let long = Nibbles::unpack(&[0x12, 0x34]);
+        let short = Nibbles::unpack([0x12]);
+        let long = Nibbles::unpack([0x12, 0x34]);
         assert_eq!(short.cmp(&long), Ordering::Less);
 
         // Test with common prefix but different values
-        let nibbles1 = Nibbles::unpack(&[0x12, 0x34]);
-        let nibbles2 = Nibbles::unpack(&[0x12, 0x35]);
+        let nibbles1 = Nibbles::unpack([0x12, 0x34]);
+        let nibbles2 = Nibbles::unpack([0x12, 0x35]);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Less);
 
         // Test with differing first byte
-        let nibbles1 = Nibbles::unpack(&[0x12, 0x34]);
-        let nibbles2 = Nibbles::unpack(&[0x13, 0x34]);
+        let nibbles1 = Nibbles::unpack([0x12, 0x34]);
+        let nibbles2 = Nibbles::unpack([0x13, 0x34]);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Less);
 
         // Test with odd length nibbles
-        let nibbles1 = Nibbles::unpack(&[0x1]);
-        let nibbles2 = Nibbles::unpack(&[0x2]);
+        let nibbles1 = Nibbles::unpack([0x1]);
+        let nibbles2 = Nibbles::unpack([0x2]);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Less);
 
         // Test with odd and even length nibbles
-        let odd = Nibbles::unpack(&[0x1]);
-        let even = Nibbles::unpack(&[0x12]);
+        let odd = Nibbles::unpack([0x1]);
+        let even = Nibbles::unpack([0x12]);
         assert_eq!(odd.cmp(&even), Ordering::Less);
 
         // Test with longer sequences
-        let nibbles1 = Nibbles::unpack(&[0x12, 0x34, 0x56, 0x78]);
-        let nibbles2 = Nibbles::unpack(&[0x12, 0x34, 0x56, 0x79]);
+        let nibbles1 = Nibbles::unpack([0x12, 0x34, 0x56, 0x78]);
+        let nibbles2 = Nibbles::unpack([0x12, 0x34, 0x56, 0x79]);
         assert_eq!(nibbles1.cmp(&nibbles2), Ordering::Less);
 
         let nibbles1 = Nibbles::from_nibbles([0x0, 0x0]);
@@ -1495,8 +1495,7 @@ mod tests {
                 assert_eq!(
                     packed_nibbles.get_unchecked(i),
                     nibbles.get_unchecked(i),
-                    "Test case {}: Nibble at index {} differs for bytes {:?}:
-    Nibbles={:?}, Nibbles={:?}",
+                    "Test case {}: Nibble at index {} differs for bytes {:?}: Nibbles={:?}, Nibbles={:?}",
                     test_idx,
                     i,
                     bytes,
@@ -1506,7 +1505,7 @@ mod tests {
             }
         }
 
-        let nibbles = Nibbles::unpack(&[0xAB, 0xCD]);
+        let nibbles = Nibbles::unpack([0xAB, 0xCD]);
         assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     }
 
