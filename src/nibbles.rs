@@ -99,7 +99,7 @@ impl fmt::Debug for Nibbles {
         if self.is_empty() {
             write!(f, "Nibbles(0x)")
         } else {
-            let shifted = self.nibbles.wrapping_shr((NIBBLES - self.len()) * 4);
+            let shifted = self.nibbles >> ((NIBBLES - self.len()) * 4);
             write!(f, "Nibbles(0x{:0width$x})", shifted, width = self.len())
         }
     }
@@ -731,18 +731,17 @@ impl Nibbles {
 
         // Optimize for common case where start == 0
         let nibbles = if start == 0 {
-            // When slicing from the beginning, we only need the end mask
-            // This avoids the XOR operation
-            self.nibbles.bitand(SLICE_MASKS[end])
+            // When slicing from the beginning, we can just apply the mask and avoid XORing
+            self.nibbles & SLICE_MASKS[end]
         } else {
             // For middle and to_end cases, always shift first
-            let shifted = self.nibbles.wrapping_shl(start * 4);
+            let shifted = self.nibbles << (start * 4);
             if slice_to_end {
                 // When slicing to the end, no mask needed after shift
                 shifted
             } else {
                 // For middle slices, apply end mask after shift
-                shifted.bitand(SLICE_MASKS[end - start])
+                shifted & SLICE_MASKS[end - start]
             }
         };
 
@@ -872,9 +871,9 @@ impl Nibbles {
         let len_bytes = other.len();
         let mut other = U256::from_be_slice(other);
         if len_bytes > 0 {
-            other = other.wrapping_shl((U256::BYTES - len_bytes) * 8);
+            other <<= (U256::BYTES - len_bytes) * 8;
         }
-        self.nibbles |= other.wrapping_shr(self.bit_len());
+        self.nibbles |= other >> self.bit_len();
         self.length += len_bytes * 2;
     }
 
