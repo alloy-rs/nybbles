@@ -63,6 +63,10 @@ static INCREMENT_VALUES: [U256; 65] = {
 /// The internal representation is currently a [`U256`] that stores two nibbles per byte. Nibbles
 /// are stored inline (on the stack), and can be up to a length of 64 nibbles, or 32 unpacked bytes.
 ///
+/// Additionally, a separate `length` field is stored to track the actual length of the nibble
+/// sequence. When the [`U256`] is modified directly, the `length` field must be updated
+/// accordingly. Otherwise, the behavior is undefined.
+///
 /// Nibbles are stored with most significant bits set first, meaning that a nibble sequence `0x101`
 /// will be stored as `0x101...0`, and not `0x0...101`.
 ///
@@ -861,10 +865,21 @@ impl Nibbles {
     }
 
     /// Extend the current nibbles with another byte slice.
-    ///
-    /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
-    /// [the type docs](Self) for more details.
     pub fn extend_from_slice(&mut self, other: &[u8]) {
+        assert!(
+            self.length + other.len() * 2 <= NIBBLES,
+            "Cannot extend: resulting length would exceed maximum capacity"
+        );
+        self.extend_from_slice_unchecked(other);
+    }
+
+    /// Extend the current nibbles with another byte slice.
+    ///
+    /// # Caution
+    ///
+    /// This method does not check if the resulting length would exceed the maximum capacity of
+    /// [`Nibbles`].
+    pub fn extend_from_slice_unchecked(&mut self, other: &[u8]) {
         if other.is_empty() {
             return;
         }
