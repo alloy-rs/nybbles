@@ -56,7 +56,7 @@ fn mk_setup<'a, T: Strategy>(
 /// Codspeed does not batch inputs even if `iter_batched` is used, so we have to
 /// do it ourselves for operations that would otherwise be too fast to be
 /// measured accurately.
-// #[cfg(codspeed)]
+#[cfg(codspeed)]
 #[inline]
 fn manual_batch<T, U>(mut setup: impl FnMut() -> T, mut f: impl FnMut(&T) -> U) -> impl FnMut(T) {
     let inputs =
@@ -71,7 +71,9 @@ fn manual_batch<T, U>(mut setup: impl FnMut() -> T, mut f: impl FnMut(&T) -> U) 
     }
 }
 
-// #[cfg(not(codspeed))]
-// fn manual_batch<T, U>(_setup: impl FnMut() -> T, f: impl FnMut(T) -> U) -> impl FnMut(T) -> U {
-//     f
-// }
+#[cfg(not(codspeed))]
+fn manual_batch<T, U>(_setup: impl FnMut() -> T, mut f: impl FnMut(&T) -> U) -> impl FnMut(T) {
+    move |input| {
+        f(&input);
+    }
+}

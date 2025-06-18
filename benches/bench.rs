@@ -42,8 +42,7 @@ pub fn bench_pack(c: &mut Criterion) {
         bench_arbitrary_with(
             c,
             format!("pack_to/{size}"),
-            arbitrary_bytes(size)
-                .prop_map(|nibbles| (vec![0; nibbles.len().div_ceil(2)], Nibbles::unpack(nibbles))),
+            arbitrary_bytes(size).prop_map(|bytes| (vec![0; bytes.len()], Nibbles::unpack(bytes))),
             |(buffer, nibbles)| {
                 black_box(nibbles).pack_to(black_box(&mut buffer.clone()));
             },
