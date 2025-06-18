@@ -206,7 +206,8 @@ pub fn bench_increment(c: &mut Criterion) {
 pub fn bench_pop(c: &mut Criterion) {
     for size in SIZE_NIBBLES {
         bench_arbitrary_with(c, format!("pop/{size}"), arbitrary_nibbles(size), |nibbles| {
-            black_box(nibbles.clone()).pop()
+            let mut nibbles = nibbles.clone();
+            while nibbles.pop().is_some() {}
         });
     }
 }
