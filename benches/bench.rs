@@ -26,7 +26,7 @@ pub fn bench_from_vec_unchecked(c: &mut Criterion) {
             c,
             format!("from_vec_unchecked/{size}"),
             arbitrary_raw_nibbles(size),
-            |data| Nibbles::from_vec_unchecked(black_box(data)),
+            |data| Nibbles::from_vec_unchecked(black_box(data.clone())),
         );
     }
 }
@@ -43,10 +43,9 @@ pub fn bench_pack(c: &mut Criterion) {
             c,
             format!("pack_to/{size}"),
             arbitrary_bytes(size)
-                .prop_map(|nibbles| (vec![0; nibbles.len()], Nibbles::unpack(nibbles))),
-            |(mut buffer, nibbles)| {
-                black_box(nibbles).pack_to(black_box(&mut buffer));
-                buffer
+                .prop_map(|nibbles| (vec![0; nibbles.len().div_ceil(2)], Nibbles::unpack(nibbles))),
+            |(buffer, nibbles)| {
+                black_box(nibbles).pack_to(black_box(&mut buffer.clone()));
             },
         );
     }
@@ -69,7 +68,7 @@ pub fn bench_push(c: &mut Criterion) {
             |raw_nibbles| {
                 let mut nibbles = Nibbles::new();
                 for nibble in raw_nibbles {
-                    nibbles.push(black_box(nibble));
+                    nibbles.push(black_box(*nibble));
                 }
                 nibbles
             },
@@ -91,7 +90,7 @@ pub fn bench_slice(c: &mut Criterion) {
                     let end = start..nibbles.len();
                     (Just(nibbles), Just(start), end)
                 }),
-            |(nibbles, start, end)| nibbles.slice(black_box(start..end)),
+            |(nibbles, start, end)| nibbles.slice(black_box(*start..*end)),
         );
     }
 }
@@ -102,7 +101,7 @@ pub fn bench_join(c: &mut Criterion) {
             c,
             format!("join/{size}"),
             (arbitrary_nibbles(size), arbitrary_nibbles(size)),
-            |(a, b)| a.join(black_box(&b)),
+            |(a, b)| a.join(black_box(b)),
         );
     }
 }
@@ -113,8 +112,8 @@ pub fn bench_extend(c: &mut Criterion) {
             c,
             format!("extend/{size}"),
             (arbitrary_nibbles(size), arbitrary_nibbles(size)),
-            |(mut base, extension)| {
-                base.extend_from_slice(black_box(&extension));
+            |(base, extension)| {
+                base.clone().extend_from_slice(black_box(extension));
             },
         );
     }
@@ -125,12 +124,12 @@ pub fn bench_set_at(c: &mut Criterion) {
         bench_arbitrary_with(
             c,
             format!("set_at/{size}"),
-            arbitrary_nibbles(size).prop_flat_map(|nibbles| {
+            arbitrary_non_empty_nibbles(size).prop_flat_map(|nibbles| {
                 let i = 0..nibbles.len();
                 (Just(nibbles), i)
             }),
-            |(mut nibbles, i)| {
-                nibbles.set_at(black_box(i), black_box((i % 16) as u8));
+            |(nibbles, i)| {
+                nibbles.clone().set_at(black_box(*i), black_box((i % 16) as u8));
             },
         );
     }
@@ -138,13 +137,13 @@ pub fn bench_set_at(c: &mut Criterion) {
 
 pub fn bench_get_byte(c: &mut Criterion) {
     for size in SIZE_NIBBLES {
-        let strategy = arbitrary_nibbles(size).prop_flat_map(|nibbles| {
+        let strategy = arbitrary_non_empty_nibbles(size).prop_flat_map(|nibbles| {
             let i = 0..nibbles.len();
             (Just(nibbles), i)
         });
 
         bench_arbitrary_with(c, format!("get_byte/{size}"), strategy.clone(), |(nibbles, i)| {
-            nibbles.get_byte(black_box(i));
+            nibbles.get_byte(black_box(*i));
         });
 
         bench_arbitrary_with(
@@ -152,7 +151,7 @@ pub fn bench_get_byte(c: &mut Criterion) {
             format!("get_byte_unchecked/{size}"),
             strategy,
             |(nibbles, i)| unsafe {
-                nibbles.get_byte_unchecked(black_box(i));
+                nibbles.get_byte_unchecked(black_box(*i));
             },
         );
     }
@@ -172,7 +171,7 @@ pub fn bench_common_prefix_length(c: &mut Criterion) {
                     let prefix = nibbles.slice(..prefix_size);
                     (nibbles, prefix)
                 }),
-            |(nibbles, prefix)| nibbles.common_prefix_length(black_box(&prefix)),
+            |(nibbles, prefix)| nibbles.common_prefix_length(black_box(prefix)),
         );
     }
 }
@@ -183,7 +182,7 @@ pub fn bench_cmp(c: &mut Criterion) {
             c,
             format!("cmp/{size}"),
             (arbitrary_nibbles(size), arbitrary_nibbles(size)),
-            |(a, b)| a.cmp(black_box(&b)),
+            |(a, b)| a.cmp(black_box(b)),
         );
     }
 }
@@ -206,8 +205,8 @@ pub fn bench_increment(c: &mut Criterion) {
 
 pub fn bench_pop(c: &mut Criterion) {
     for size in SIZE_NIBBLES {
-        bench_arbitrary_with(c, format!("pop/{size}"), arbitrary_nibbles(size), |mut nibbles| {
-            black_box(&mut nibbles).pop()
+        bench_arbitrary_with(c, format!("pop/{size}"), arbitrary_nibbles(size), |nibbles| {
+            black_box(nibbles.clone()).pop()
         });
     }
 }
@@ -242,7 +241,7 @@ pub fn bench_starts_with(c: &mut Criterion) {
                     let prefix = nibbles.slice(..prefix_size);
                     (nibbles, prefix)
                 }),
-            |(nibbles, prefix)| nibbles.starts_with(black_box(&prefix)),
+            |(nibbles, prefix)| nibbles.starts_with(black_box(prefix)),
         );
     }
 }
@@ -261,7 +260,7 @@ pub fn bench_ends_with(c: &mut Criterion) {
                     let suffix = nibbles.slice(nibbles.len() - suffix_size..);
                     (nibbles, suffix)
                 }),
-            |(nibbles, suffix)| nibbles.ends_with(black_box(&suffix)),
+            |(nibbles, suffix)| nibbles.ends_with(black_box(suffix)),
         );
     }
 }
@@ -275,9 +274,8 @@ pub fn bench_truncate(c: &mut Criterion) {
                 let new_len = 0..nibbles.len();
                 (Just(nibbles), new_len)
             }),
-            |(mut nibbles, new_len)| {
-                nibbles.truncate(black_box(new_len));
-                nibbles
+            |(nibbles, new_len)| {
+                nibbles.clone().truncate(black_box(*new_len));
             },
         );
     }
@@ -285,8 +283,8 @@ pub fn bench_truncate(c: &mut Criterion) {
 
 pub fn bench_clear(c: &mut Criterion) {
     for size in SIZE_NIBBLES {
-        bench_arbitrary_with(c, format!("clear/{size}"), arbitrary_nibbles(size), |mut nibbles| {
-            black_box(&mut nibbles).clear()
+        bench_arbitrary_with(c, format!("clear/{size}"), arbitrary_nibbles(size), |nibbles| {
+            black_box(nibbles.clone()).clear()
         });
     }
 }

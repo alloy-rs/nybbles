@@ -19,6 +19,10 @@ pub fn arbitrary_nibbles(size: usize) -> impl Strategy<Value = Nibbles> + Clone 
     proptest::collection::vec(0u8..16, size).prop_map(Nibbles::from_nibbles)
 }
 
+pub fn arbitrary_non_empty_nibbles(size: usize) -> impl Strategy<Value = Nibbles> + Clone {
+    proptest::collection::vec(0u8..16, 1..size).prop_map(Nibbles::from_nibbles)
+}
+
 pub fn arbitrary_raw_nibbles(size: usize) -> impl Strategy<Value = Vec<u8>> + Clone {
     proptest::collection::vec(0u8..16, size)
 }
@@ -31,7 +35,7 @@ pub fn bench_arbitrary_with<T: Strategy, U>(
     criterion: &mut criterion::Criterion,
     name: impl AsRef<str>,
     input: T,
-    f: impl FnMut(T::Value) -> U,
+    f: impl FnMut(&T::Value) -> U,
 ) {
     let name = name.as_ref();
     let runner = std::cell::RefCell::new(TestRunner::deterministic());
@@ -52,33 +56,22 @@ fn mk_setup<'a, T: Strategy>(
 /// Codspeed does not batch inputs even if `iter_batched` is used, so we have to
 /// do it ourselves for operations that would otherwise be too fast to be
 /// measured accurately.
-#[cfg(codspeed)]
+// #[cfg(codspeed)]
 #[inline]
-fn manual_batch<T, U>(mut setup: impl FnMut() -> T, mut f: impl FnMut(T) -> U) -> impl FnMut(T) {
-    assert!(
-        !std::mem::needs_drop::<T>(),
-        "cannot batch inputs that need to be dropped: {}",
-        std::any::type_name::<T>(),
-    );
-    assert!(
-        !std::mem::needs_drop::<U>(),
-        "cannot batch outputs that need to be dropped: {}",
-        std::any::type_name::<U>(),
-    );
-
+fn manual_batch<T, U>(mut setup: impl FnMut() -> T, mut f: impl FnMut(&T) -> U) -> impl FnMut(T) {
     let inputs =
-        criterion::black_box((0..CODSPEED_BATCH_SIZE).map(|_| setup()).collect::<Box<[_]>>());
+        criterion::black_box((0..CODSPEED_BATCH_SIZE).map(|_| setup()).collect::<Vec<_>>());
     let mut out = criterion::black_box(Box::new_uninit_slice(CODSPEED_BATCH_SIZE));
     move |_| {
         for i in 0..criterion::black_box(CODSPEED_BATCH_SIZE) {
-            let input = unsafe { std::ptr::read(inputs.get_unchecked(i)) };
+            let input = unsafe { inputs.get_unchecked(i) };
             let output = unsafe { out.get_unchecked_mut(i) };
             output.write(f(input));
         }
     }
 }
 
-#[cfg(not(codspeed))]
-fn manual_batch<T, U>(_setup: impl FnMut() -> T, f: impl FnMut(T) -> U) -> impl FnMut(T) -> U {
-    f
-}
+// #[cfg(not(codspeed))]
+// fn manual_batch<T, U>(_setup: impl FnMut() -> T, f: impl FnMut(T) -> U) -> impl FnMut(T) -> U {
+//     f
+// }
