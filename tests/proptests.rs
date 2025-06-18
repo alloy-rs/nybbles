@@ -9,7 +9,6 @@ fn valid_nibbles(nibbles: &[u8]) -> bool {
 
 // Basic operations group - creation, conversion, basic manipulation
 proptest! {
-
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
     fn pack_unpack_roundtrip(input in vec(any::<u8>(), 0..64)) {
@@ -247,7 +246,6 @@ proptest! {
 
 // Query and comparison operations group
 proptest! {
-
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
     fn common_prefix_length_properties(
