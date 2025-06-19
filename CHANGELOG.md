@@ -5,10 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.0) - 2025-06-19
+
+### Dependencies
+
+- More benchmarks ([#20](https://github.com/alloy-rs/nybbles/issues/20))
+
+### Features
+
+- Add missing benchmarks for performance-critical methods ([#22](https://github.com/alloy-rs/nybbles/issues/22))
+
+### Other
+
+- More cases for slice ([#21](https://github.com/alloy-rs/nybbles/issues/21))
+- Add codspeed ([#18](https://github.com/alloy-rs/nybbles/issues/18))
+
+### Performance
+
+- `U256` representation ([#17](https://github.com/alloy-rs/nybbles/issues/17))
+
+### Styling
+
+- Add proptests ([#26](https://github.com/alloy-rs/nybbles/issues/26))
+
 ## [0.3.4](https://github.com/alloy-rs/nybbles/releases/tag/v0.3.4) - 2025-01-06
 
 ### Miscellaneous Tasks
 
+- Release 0.3.4
 - Better debug impl ([#16](https://github.com/alloy-rs/nybbles/issues/16))
 
 ### Other
