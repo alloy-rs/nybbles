@@ -1,516 +1,292 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+mod prelude;
+
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use nybbles::Nibbles;
-use proptest::{prelude::*, strategy::ValueTree};
-use std::{hint::black_box, time::Duration};
+use prelude::*;
+use proptest::{prelude::Just, strategy::Strategy};
+use std::time::Duration;
 
 const SIZE_NIBBLES: [usize; 4] = [8, 16, 32, 64];
 const SIZE_BYTES: [usize; 4] = [4, 8, 16, 32];
 
 pub fn bench_from_nibbles(c: &mut Criterion) {
-    let mut group = c.benchmark_group("from_nibbles");
-
     for size in SIZE_NIBBLES {
-        let nibbles_data = generate_nibbles(size);
-
-        group.throughput(Throughput::Elements(size as u64));
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles_data, |b, data| {
-            b.iter(|| Nibbles::from_nibbles(black_box(data)))
-        });
-    }
-
-    group.finish();
-}
-
-pub fn bench_pack(c: &mut Criterion) {
-    let mut group = c.benchmark_group("pack");
-
-    for &size in &SIZE_BYTES {
-        let bytes = generate_bytes(size);
-        let nibbles = Nibbles::unpack(&bytes);
-
-        group.throughput(Throughput::Bytes(size as u64));
-
-        group.bench_with_input(BenchmarkId::new("pack", size), &nibbles, |b, data| {
-            b.iter(|| black_box(data).pack())
-        });
-
-        let output = vec![0u8; nibbles.len().div_ceil(2)];
-        group.bench_with_input(
-            BenchmarkId::new("pack_to", size),
-            &(nibbles, output),
-            |b, (data, buf)| {
-                b.iter_batched(
-                    || buf.clone(),
-                    |mut buffer| {
-                        black_box(data).pack_to(black_box(&mut buffer));
-                        buffer
-                    },
-                    criterion::BatchSize::SmallInput,
-                )
-            },
+        bench_arbitrary_with(
+            c,
+            format!("from_nibbles[{size}]"),
+            proptest::collection::vec(0u8..16, size),
+            |data| Nibbles::from_nibbles(black_box(data)),
         );
     }
-
-    group.finish();
-}
-
-pub fn bench_unpack(c: &mut Criterion) {
-    let mut group = c.benchmark_group("unpack");
-
-    for &size in &SIZE_BYTES {
-        let bytes = generate_bytes(size);
-
-        group.throughput(Throughput::Bytes(size as u64));
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &bytes, |b, data| {
-            b.iter(|| Nibbles::unpack(black_box(data)))
-        });
-    }
-
-    group.finish();
-}
-
-pub fn bench_push(c: &mut Criterion) {
-    let mut group = c.benchmark_group("push");
-
-    for size in SIZE_NIBBLES {
-        group.throughput(Throughput::Elements(size as u64));
-
-        let nibbles = generate_nibbles(size);
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles, |b, nibbles| {
-            b.iter(|| {
-                let mut nib = Nibbles::new();
-                for nibble in nibbles {
-                    nib.push(black_box(*nibble));
-                }
-                nib
-            })
-        });
-    }
-
-    group.finish();
-}
-
-pub fn bench_slice(c: &mut Criterion) {
-    let mut group = c.benchmark_group("slice");
-
-    for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-
-        group.bench_with_input(BenchmarkId::new("from_start", size), &nibbles, |b, data| {
-            let end = data.len() / 2;
-            b.iter(|| black_box(data).slice(black_box(0..end)))
-        });
-        group.bench_with_input(BenchmarkId::new("middle", size), &nibbles, |b, data| {
-            let start = data.len() / 4;
-            let end = data.len() / 2;
-            b.iter(|| black_box(data).slice(black_box(start..end)))
-        });
-        group.bench_with_input(BenchmarkId::new("to_end", size), &nibbles, |b, data| {
-            let start = data.len() / 2;
-            b.iter(|| black_box(data).slice(black_box(start..)))
-        });
-    }
-
-    group.finish();
-}
-
-pub fn bench_join(c: &mut Criterion) {
-    let mut group = c.benchmark_group("join");
-
-    for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-        let other_nibbles = Nibbles::from_nibbles(generate_nibbles(size / 2));
-
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &(nibbles.clone(), other_nibbles.clone()),
-            |b, (a, b_nib)| b.iter(|| black_box(a).join(black_box(b_nib))),
-        );
-    }
-
-    group.finish();
-}
-
-pub fn bench_extend(c: &mut Criterion) {
-    let mut group = c.benchmark_group("extend");
-
-    for &size in &SIZE_NIBBLES[..SIZE_NIBBLES.len() - 1] {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-        let other_nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-
-        group.throughput(Throughput::Elements(size as u64));
-
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &(nibbles.clone(), other_nibbles.clone()),
-            |b, (a, b_nib)| {
-                b.iter_batched(
-                    || a.clone(),
-                    |mut nib| {
-                        nib.extend_from_slice(black_box(b_nib));
-                        nib
-                    },
-                    criterion::BatchSize::SmallInput,
-                )
-            },
-        );
-    }
-
-    group.finish();
-}
-
-pub fn bench_set_at(c: &mut Criterion) {
-    let mut group = c.benchmark_group("set_at");
-
-    for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles, |b, data| {
-            b.iter_batched(
-                || data.clone(),
-                |mut nib| {
-                    for i in 0..nib.len() {
-                        nib.set_at(black_box(i), black_box((i % 16) as u8));
-                    }
-                    nib
-                },
-                criterion::BatchSize::SmallInput,
-            )
-        });
-    }
-
-    group.finish();
-}
-
-pub fn bench_get_byte(c: &mut Criterion) {
-    let mut group = c.benchmark_group("get_byte");
-
-    for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-
-        group.bench_with_input(BenchmarkId::new("get_byte", size), &nibbles, |b, data| {
-            b.iter(|| {
-                let mut sum = 0u64;
-                for i in 0..data.len().saturating_sub(1) {
-                    if let Some(byte) = data.get_byte(black_box(i)) {
-                        sum = sum.wrapping_add(byte as u64);
-                    }
-                }
-                sum
-            })
-        });
-
-        group.bench_with_input(
-            BenchmarkId::new("get_byte_unchecked", size),
-            &nibbles,
-            |b, data| {
-                b.iter(|| {
-                    let mut sum = 0u64;
-                    for i in 0..data.len().saturating_sub(1) {
-                        unsafe {
-                            let byte = data.get_byte_unchecked(black_box(i));
-                            sum = sum.wrapping_add(byte as u64);
-                        }
-                    }
-                    sum
-                })
-            },
-        );
-    }
-
-    group.finish();
-}
-
-pub fn bench_common_prefix_length(c: &mut Criterion) {
-    let mut group = c.benchmark_group("common_prefix_length");
-
-    for size in SIZE_NIBBLES {
-        let nibbles_a = Nibbles::from_nibbles(generate_nibbles(size));
-        let nibbles_b = nibbles_a.slice(..nibbles_a.len() - 1);
-
-        group.throughput(Throughput::Elements(nibbles_b.len() as u64));
-
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &(nibbles_a.clone(), nibbles_b),
-            |b, (data, other)| b.iter(|| data.common_prefix_length(black_box(other))),
-        );
-    }
-
-    group.finish();
-}
-
-pub fn bench_cmp(c: &mut Criterion) {
-    let mut group = c.benchmark_group("cmp");
-
-    for size in SIZE_NIBBLES {
-        let nibbles_a = Nibbles::from_nibbles(generate_nibbles(size));
-        let nibbles_b = Nibbles::from_nibbles(generate_nibbles(size));
-
-        group.throughput(Throughput::Elements(size as u64));
-
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &(nibbles_a.clone(), nibbles_b),
-            |b, (data, other)| b.iter(|| black_box(data).cmp(black_box(other))),
-        );
-    }
-
-    group.finish();
-}
-
-pub fn bench_clone(c: &mut Criterion) {
-    let mut group = c.benchmark_group("clone");
-
-    for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-
-        group.throughput(Throughput::Elements(size as u64));
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles, |b, data| {
-            b.iter(|| black_box(data).clone())
-        });
-    }
-
-    group.finish();
-}
-
-pub fn bench_increment(c: &mut Criterion) {
-    let mut group = c.benchmark_group("increment");
-
-    for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles, |b, data| {
-            b.iter(|| black_box(data).increment())
-        });
-    }
-
-    group.finish();
-}
-
-pub fn bench_pop(c: &mut Criterion) {
-    let mut group = c.benchmark_group("pop");
-
-    for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-
-        group.throughput(Throughput::Elements(size as u64));
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles, |b, data| {
-            b.iter_batched(
-                || data.clone(),
-                |mut nib| {
-                    for _ in 0..nib.len() {
-                        black_box(nib.pop());
-                    }
-                    nib
-                },
-                criterion::BatchSize::SmallInput,
-            )
-        });
-    }
-
-    group.finish();
 }
 
 pub fn bench_from_vec_unchecked(c: &mut Criterion) {
-    let mut group = c.benchmark_group("from_vec_unchecked");
-
     for size in SIZE_NIBBLES {
-        let nibbles_vec = generate_nibbles(size);
-
-        group.throughput(Throughput::Elements(size as u64));
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles_vec, |b, data| {
-            b.iter(|| Nibbles::from_vec_unchecked(black_box(data.clone())))
-        });
-    }
-
-    group.finish();
-}
-
-pub fn bench_first(c: &mut Criterion) {
-    let mut group = c.benchmark_group("first");
-
-    for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles, |b, data| {
-            b.iter(|| black_box(data).first())
-        });
-    }
-
-    group.finish();
-}
-
-pub fn bench_last(c: &mut Criterion) {
-    let mut group = c.benchmark_group("last");
-
-    for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles, |b, data| {
-            b.iter(|| black_box(data).last())
-        });
-    }
-
-    group.finish();
-}
-
-pub fn bench_starts_with(c: &mut Criterion) {
-    let mut group = c.benchmark_group("starts_with");
-
-    for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-        let prefix_len = size / 4;
-        let prefix = nibbles.slice(..prefix_len);
-
-        group.throughput(Throughput::Elements(size as u64));
-
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &(nibbles.clone(), prefix),
-            |b, (data, prefix)| b.iter(|| black_box(data).starts_with(black_box(prefix))),
+        bench_arbitrary_with(
+            c,
+            format!("from_vec_unchecked[{size}]"),
+            arbitrary_raw_nibbles(size),
+            |data| Nibbles::from_vec_unchecked(black_box(data.clone())),
         );
     }
-
-    group.finish();
 }
 
-pub fn bench_ends_with(c: &mut Criterion) {
-    let mut group = c.benchmark_group("ends_with");
-
+pub fn bench_pack(c: &mut Criterion) {
     for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-        let suffix_len = size / 4;
-        let suffix = nibbles.slice(size - suffix_len..);
-
-        group.throughput(Throughput::Elements(size as u64));
-
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &(nibbles.clone(), suffix),
-            |b, (data, suffix)| b.iter(|| black_box(data).ends_with(black_box(suffix))),
-        );
+        bench_arbitrary_with(c, format!("pack[{size}]"), arbitrary_nibbles(size), |nibbles| {
+            black_box(nibbles).pack()
+        });
     }
 
-    group.finish();
-}
-
-pub fn bench_truncate(c: &mut Criterion) {
-    let mut group = c.benchmark_group("truncate");
-
-    for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-        let new_len = size / 2;
-
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &(nibbles.clone(), new_len),
-            |b, (data, len)| {
-                b.iter_batched(
-                    || data.clone(),
-                    |mut nib| {
-                        nib.truncate(black_box(*len));
-                        nib
-                    },
-                    criterion::BatchSize::SmallInput,
-                )
+    for size in SIZE_BYTES {
+        bench_arbitrary_with(
+            c,
+            format!("pack_to[{size}]"),
+            arbitrary_bytes(size).prop_map(|bytes| (vec![0; bytes.len()], Nibbles::unpack(bytes))),
+            |(buffer, nibbles)| {
+                black_box(nibbles).pack_to(black_box(&mut buffer.clone()));
             },
         );
     }
+}
 
-    group.finish();
+pub fn bench_unpack(c: &mut Criterion) {
+    for size in SIZE_BYTES {
+        bench_arbitrary_with(c, format!("unpack[{size}]"), arbitrary_bytes(size), |data| {
+            Nibbles::unpack(black_box(&data))
+        });
+    }
+}
+
+pub fn bench_push(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(
+            c,
+            format!("push[{size}]"),
+            arbitrary_raw_nibbles(size),
+            |raw_nibbles| {
+                let mut nibbles = Nibbles::new();
+                for nibble in raw_nibbles {
+                    nibbles.push(black_box(*nibble));
+                }
+                nibbles
+            },
+        );
+    }
+}
+
+pub fn bench_slice(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(
+            c,
+            format!("slice[{size}]"),
+            arbitrary_nibbles(size)
+                .prop_flat_map(|nibbles| {
+                    let start = 0..(nibbles.len() - 1);
+                    (Just(nibbles), start)
+                })
+                .prop_flat_map(|(nibbles, start)| {
+                    let end = start..nibbles.len();
+                    (Just(nibbles), Just(start), end)
+                }),
+            |(nibbles, start, end)| nibbles.slice(black_box(*start..*end)),
+        );
+    }
+}
+
+pub fn bench_join(c: &mut Criterion) {
+    for &size in &SIZE_NIBBLES[..SIZE_NIBBLES.len() - 1] {
+        bench_arbitrary_with(
+            c,
+            format!("join[{size}]"),
+            (arbitrary_nibbles(size), arbitrary_nibbles(size)),
+            |(a, b)| a.join(black_box(b)),
+        );
+    }
+}
+
+pub fn bench_extend(c: &mut Criterion) {
+    for &size in &SIZE_NIBBLES[..SIZE_NIBBLES.len() - 1] {
+        bench_arbitrary_with(
+            c,
+            format!("extend[{size}]"),
+            (arbitrary_nibbles(size), arbitrary_nibbles(size)),
+            |(base, extension)| {
+                base.clone().extend_from_slice(black_box(extension));
+            },
+        );
+    }
+}
+
+pub fn bench_set_at(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(
+            c,
+            format!("set_at[{size}]"),
+            arbitrary_non_empty_nibbles(size).prop_flat_map(|nibbles| {
+                let i = 0..nibbles.len();
+                (Just(nibbles), i)
+            }),
+            |(nibbles, i)| {
+                nibbles.clone().set_at(black_box(*i), black_box((i % 16) as u8));
+            },
+        );
+    }
+}
+
+pub fn bench_get_byte(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        let strategy = arbitrary_non_empty_nibbles(size).prop_flat_map(|nibbles| {
+            let i = 0..nibbles.len();
+            (Just(nibbles), i)
+        });
+
+        bench_arbitrary_with(c, format!("get_byte[{size}]"), strategy.clone(), |(nibbles, i)| {
+            nibbles.get_byte(black_box(*i));
+        });
+
+        bench_arbitrary_with(
+            c,
+            format!("get_byte_unchecked[{size}]"),
+            strategy,
+            |(nibbles, i)| unsafe {
+                nibbles.get_byte_unchecked(black_box(*i));
+            },
+        );
+    }
+}
+
+pub fn bench_common_prefix_length(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(
+            c,
+            format!("common_prefix_length[{size}]"),
+            arbitrary_nibbles(size)
+                .prop_flat_map(|nibbles| {
+                    let prefix_size = 0..nibbles.len();
+                    (Just(nibbles), prefix_size)
+                })
+                .prop_map(|(nibbles, prefix_size)| {
+                    let prefix = nibbles.slice(..prefix_size);
+                    (nibbles, prefix)
+                }),
+            |(nibbles, prefix)| nibbles.common_prefix_length(black_box(prefix)),
+        );
+    }
+}
+
+pub fn bench_cmp(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(
+            c,
+            format!("cmp[{size}]"),
+            (arbitrary_nibbles(size), arbitrary_nibbles(size)),
+            |(a, b)| a.cmp(black_box(b)),
+        );
+    }
+}
+
+pub fn bench_clone(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(c, format!("clone[{size}]"), arbitrary_nibbles(size), |nibbles| {
+            black_box(nibbles).clone()
+        });
+    }
+}
+
+pub fn bench_increment(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(c, format!("increment[{size}]"), arbitrary_nibbles(size), |nibbles| {
+            black_box(nibbles).increment()
+        });
+    }
+}
+
+pub fn bench_pop(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(c, format!("pop[{size}]"), arbitrary_nibbles(size), |nibbles| {
+            let mut nibbles = nibbles.clone();
+            while nibbles.pop().is_some() {}
+        });
+    }
+}
+
+pub fn bench_first(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(c, format!("first[{size}]"), arbitrary_nibbles(size), |nibbles| {
+            black_box(&nibbles).first()
+        });
+    }
+}
+
+pub fn bench_last(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(c, format!("last[{size}]"), arbitrary_nibbles(size), |nibbles| {
+            black_box(&nibbles).last()
+        });
+    }
+}
+
+pub fn bench_starts_with(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(
+            c,
+            format!("starts_with[{size}]"),
+            arbitrary_nibbles(size)
+                .prop_flat_map(|nibbles| {
+                    let prefix_size = 0..nibbles.len();
+                    (Just(nibbles), prefix_size)
+                })
+                .prop_map(|(nibbles, prefix_size)| {
+                    let prefix = nibbles.slice(..prefix_size);
+                    (nibbles, prefix)
+                }),
+            |(nibbles, prefix)| nibbles.starts_with(black_box(prefix)),
+        );
+    }
+}
+
+pub fn bench_ends_with(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(
+            c,
+            format!("ends_with[{size}]"),
+            arbitrary_nibbles(size)
+                .prop_flat_map(|nibbles| {
+                    let suffix_size = 0..nibbles.len();
+                    (Just(nibbles), suffix_size)
+                })
+                .prop_map(|(nibbles, suffix_size)| {
+                    let suffix = nibbles.slice(nibbles.len() - suffix_size..);
+                    (nibbles, suffix)
+                }),
+            |(nibbles, suffix)| nibbles.ends_with(black_box(suffix)),
+        );
+    }
+}
+
+pub fn bench_truncate(c: &mut Criterion) {
+    for size in SIZE_NIBBLES {
+        bench_arbitrary_with(
+            c,
+            format!("truncate[{size}]"),
+            arbitrary_nibbles(size).prop_flat_map(|nibbles| {
+                let new_len = 0..nibbles.len();
+                (Just(nibbles), new_len)
+            }),
+            |(nibbles, new_len)| {
+                nibbles.clone().truncate(black_box(*new_len));
+            },
+        );
+    }
 }
 
 pub fn bench_clear(c: &mut Criterion) {
-    let mut group = c.benchmark_group("clear");
-
     for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &nibbles, |b, data| {
-            b.iter_batched(
-                || data.clone(),
-                |mut nib| {
-                    nib.clear();
-                    nib
-                },
-                criterion::BatchSize::SmallInput,
-            )
+        bench_arbitrary_with(c, format!("clear[{size}]"), arbitrary_nibbles(size), |nibbles| {
+            black_box(nibbles.clone()).clear()
         });
     }
-
-    group.finish();
-}
-
-pub fn nibbles_benchmark(c: &mut Criterion) {
-    {
-        let mut g = c.benchmark_group("unpack");
-        for size in SIZE_BYTES {
-            g.throughput(criterion::Throughput::Bytes(size as u64));
-
-            let id = criterion::BenchmarkId::new("naive", size);
-            g.bench_function(id, |b| {
-                let bytes = &generate_bytes(size)[..];
-                b.iter(|| unpack_naive(black_box(bytes)))
-            });
-
-            let id = criterion::BenchmarkId::new("nybbles", size);
-            g.bench_function(id, |b| {
-                let bytes = &generate_bytes(size)[..];
-                b.iter(|| Nibbles::unpack(black_box(bytes)))
-            });
-        }
-    }
-
-    {
-        let mut g = c.benchmark_group("pack");
-        for size in SIZE_NIBBLES {
-            g.throughput(criterion::Throughput::Elements(size as u64));
-
-            let id = criterion::BenchmarkId::new("naive", size);
-            g.bench_function(id, |b| {
-                let bytes = &get_nibbles(size)[..];
-                b.iter(|| pack_naive(black_box(bytes)))
-            });
-
-            let id = criterion::BenchmarkId::new("nybbles", size);
-            g.bench_function(id, |b| {
-                let bytes = &get_nibbles(size);
-                b.iter(|| black_box(bytes).pack())
-            });
-        }
-    }
-}
-
-fn generate_bytes(len: usize) -> Vec<u8> {
-    proptest::collection::vec(proptest::arbitrary::any::<u8>(), len)
-        .new_tree(&mut Default::default())
-        .unwrap()
-        .current()
-}
-
-fn generate_nibbles(len: usize) -> Vec<u8> {
-    proptest::collection::vec(0u8..16, len).new_tree(&mut Default::default()).unwrap().current()
-}
-
-fn get_nibbles(len: usize) -> Nibbles {
-    Nibbles::from_nibbles(generate_nibbles(len))
-}
-
-fn unpack_naive(bytes: &[u8]) -> Vec<u8> {
-    bytes.iter().flat_map(|byte| [byte >> 4, byte & 0x0f]).collect()
-}
-
-fn pack_naive(bytes: &[u8]) -> Vec<u8> {
-    let chunks = bytes.chunks_exact(2);
-    let rem = chunks.remainder();
-    chunks.map(|chunk| (chunk[0] << 4) | chunk[1]).chain(rem.iter().copied()).collect()
 }
 
 criterion_group!(
@@ -520,18 +296,8 @@ criterion_group!(
         .noise_threshold(0.20);
     targets = bench_from_nibbles, bench_pack, bench_unpack, bench_push, bench_slice,
               bench_join, bench_extend, bench_set_at, bench_get_byte, bench_common_prefix_length,
-              bench_cmp, bench_clone, bench_increment, bench_pop, bench_from_vec_unchecked, bench_first,
-              bench_last, bench_starts_with, bench_ends_with, bench_truncate, bench_clear,
-              nibbles_benchmark
+              bench_cmp, bench_clone, bench_increment, bench_pop, bench_from_vec_unchecked,
+              bench_first, bench_last, bench_starts_with, bench_ends_with, bench_truncate,
+              bench_clear
 );
 criterion_main!(benches);
-
-#[test]
-fn naive_equivalency() {
-    for len in [0, 1, 2, 3, 4, 15, 16, 17, 31, 32, 33] {
-        let bytes = generate_bytes(len);
-        let nibbles = Nibbles::unpack(&bytes);
-        assert_eq!(unpack_naive(&bytes)[..], nibbles[..]);
-        assert_eq!(pack_naive(&nibbles[..])[..], nibbles.pack()[..]);
-    }
-}
