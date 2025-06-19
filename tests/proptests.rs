@@ -3,15 +3,15 @@
 use nybbles::Nibbles;
 use proptest::{collection::vec, prelude::*};
 
-fn valid_nibbles(nibbles: &[u8]) -> bool {
-    nibbles.iter().all(|&nibble| nibble <= 0xf)
+fn valid_nibbles(nibbles: &Nibbles) -> bool {
+    nibbles.to_vec().iter().all(|&nibble| nibble <= 0xf)
 }
 
 // Basic operations group - creation, conversion, basic manipulation
 proptest! {
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
-    fn pack_unpack_roundtrip(input in vec(any::<u8>(), 0..64)) {
+    fn pack_unpack_roundtrip(input in vec(any::<u8>(), 0..=32)) {
         let nibbles = Nibbles::unpack(&input);
         prop_assert!(valid_nibbles(&nibbles));
         let packed = nibbles.pack();
@@ -20,16 +20,16 @@ proptest! {
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
-    fn from_nibbles_roundtrip(nibbles_data in vec(0u8..16, 0..64)) {
+    fn from_nibbles_roundtrip(nibbles_data in vec(0u8..16, 0..=64)) {
         let nibbles = Nibbles::from_nibbles(&nibbles_data);
-        prop_assert_eq!(nibbles.as_slice(), &nibbles_data[..]);
+        prop_assert_eq!(nibbles.to_vec(), &nibbles_data[..]);
         prop_assert_eq!(nibbles.len(), nibbles_data.len());
     }
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
     fn push_pop_roundtrip(
-        initial_nibbles in vec(0u8..16, 0..63),
+        initial_nibbles in vec(0u8..16, 0..64),
         extra_nibble in 0u8..16
     ) {
         let mut nibbles = Nibbles::from_nibbles(&initial_nibbles);
@@ -42,12 +42,12 @@ proptest! {
         let popped = nibbles.pop();
         prop_assert_eq!(popped, Some(extra_nibble));
         prop_assert_eq!(nibbles.len(), original_len);
-        prop_assert_eq!(nibbles.as_slice(), &initial_nibbles[..]);
+        prop_assert_eq!(nibbles.to_vec(), &initial_nibbles[..]);
     }
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
-    fn get_byte_consistency(nibbles_data in vec(0u8..16, 2..64)) {
+    fn get_byte_consistency(nibbles_data in vec(0u8..16, 2..=64)) {
         let nibbles = Nibbles::from_nibbles(&nibbles_data);
         for i in 0..nibbles_data.len()-1 {
             let expected = (nibbles_data[i] << 4) | nibbles_data[i + 1];
@@ -65,7 +65,7 @@ proptest! {
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
-    fn first_last_properties(nibbles_data in vec(0u8..16, 1..64)) {
+    fn first_last_properties(nibbles_data in vec(0u8..16, 1..=64)) {
         let nibbles = Nibbles::from_nibbles(&nibbles_data);
 
         prop_assert_eq!(nibbles.first(), Some(nibbles_data[0]));
@@ -80,7 +80,7 @@ proptest! {
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
     fn set_at_properties(
-        nibbles_data in vec(0u8..16, 1..64),
+        nibbles_data in vec(0u8..16, 1..=64),
         new_value in 0u8..16
     ) {
         let len = nibbles_data.len();
@@ -88,19 +88,20 @@ proptest! {
         // Test setting at first index
         let mut nibbles = Nibbles::from_nibbles(&nibbles_data);
         nibbles.set_at(0, new_value);
-        prop_assert_eq!(nibbles[0], new_value);
+        prop_assert_eq!(nibbles.get_unchecked(0), new_value);
         prop_assert_eq!(nibbles.len(), len);
 
         // Test setting at last index
         if len > 1 {
             let mut nibbles = Nibbles::from_nibbles(&nibbles_data);
             nibbles.set_at(len - 1, new_value);
-            prop_assert_eq!(nibbles[len - 1], new_value);
+            prop_assert_eq!(nibbles.get_unchecked(len - 1), new_value);
             prop_assert_eq!(nibbles.len(), len);
 
             // Other elements should remain unchanged
+            #[allow(clippy::needless_range_loop)]
             for i in 0..len-1 {
-                prop_assert_eq!(nibbles[i], nibbles_data[i]);
+                prop_assert_eq!(nibbles.get_unchecked(i), nibbles_data[i]);
             }
         }
 
@@ -109,13 +110,13 @@ proptest! {
             let mid = len / 2;
             let mut nibbles = Nibbles::from_nibbles(&nibbles_data);
             nibbles.set_at(mid, new_value);
-            prop_assert_eq!(nibbles[mid], new_value);
+            prop_assert_eq!(nibbles.get_unchecked(mid),  new_value);
             prop_assert_eq!(nibbles.len(), len);
 
             // Other elements should remain unchanged
             for (i, &original) in nibbles_data.iter().enumerate() {
                 if i != mid {
-                    prop_assert_eq!(nibbles[i], original);
+                    prop_assert_eq!(nibbles.get_unchecked(i), original);
                 }
             }
         }
@@ -124,32 +125,31 @@ proptest! {
 
 // Slice and manipulation operations group
 proptest! {
-
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
-    fn slice_consistency(nibbles_data in vec(0u8..16, 1..64)) {
+    fn slice_consistency(nibbles_data in vec(0u8..16, 1..=64)) {
         let nibbles = Nibbles::from_nibbles(&nibbles_data);
         let len = nibbles_data.len();
 
         // Test specific slice cases to avoid rejection issues
         // Test full slice
         let full_slice = nibbles.slice(..);
-        prop_assert_eq!(full_slice.as_slice(), &nibbles_data[..]);
+        prop_assert_eq!(full_slice.to_vec(), &nibbles_data[..]);
 
         // Test first half
         if len > 1 {
             let mid = len / 2;
             let first_half = nibbles.slice(..mid);
-            prop_assert_eq!(first_half.as_slice(), &nibbles_data[..mid]);
+            prop_assert_eq!(first_half.to_vec(), &nibbles_data[..mid]);
 
             // Test second half
             let second_half = nibbles.slice(mid..);
-            prop_assert_eq!(second_half.as_slice(), &nibbles_data[mid..]);
+            prop_assert_eq!(second_half.to_vec(), &nibbles_data[mid..]);
 
             // Test middle slice
             if mid + 1 < len {
                 let middle_slice = nibbles.slice(mid..mid+1);
-                prop_assert_eq!(middle_slice.as_slice(), &nibbles_data[mid..mid+1]);
+                prop_assert_eq!(middle_slice.to_vec(), &nibbles_data[mid..mid+1]);
             }
         }
 
@@ -161,23 +161,23 @@ proptest! {
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
     fn extend_consistency(
-        nibbles1 in vec(0u8..16, 0..32),
-        nibbles2 in vec(0u8..16, 0..32)
+        nibbles1 in vec(0u8..16, 0..=32),
+        nibbles2 in vec(0u8..16, 0..=32)
     ) {
         let mut result = Nibbles::from_nibbles(&nibbles1);
         let other = Nibbles::from_nibbles(&nibbles2);
 
-        result.extend_from_slice(&other);
+        result.extend(&other);
 
         let expected: Vec<u8> = nibbles1.into_iter().chain(nibbles2.into_iter()).collect();
-        prop_assert_eq!(result.as_slice(), &expected[..]);
+        prop_assert_eq!(result.to_vec(), &expected[..]);
     }
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
     fn join_consistency(
-        nibbles1 in vec(0u8..16, 0..32),
-        nibbles2 in vec(0u8..16, 0..32)
+        nibbles1 in vec(0u8..16, 0..=32),
+        nibbles2 in vec(0u8..16, 0..=32)
     ) {
         let n1 = Nibbles::from_nibbles(&nibbles1);
         let n2 = Nibbles::from_nibbles(&nibbles2);
@@ -185,13 +185,13 @@ proptest! {
         let joined = n1.join(&n2);
 
         let expected: Vec<u8> = nibbles1.into_iter().chain(nibbles2.into_iter()).collect();
-        prop_assert_eq!(joined.as_slice(), &expected[..]);
+        prop_assert_eq!(joined.to_vec(), &expected[..]);
         prop_assert_eq!(joined.len(), n1.len() + n2.len());
     }
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
-    fn truncate_consistency(nibbles_data in vec(0u8..16, 1..64)) {
+    fn truncate_consistency(nibbles_data in vec(0u8..16, 1..=64)) {
         let original_len = nibbles_data.len();
 
         // Test truncating to zero
@@ -205,19 +205,19 @@ proptest! {
             let new_len = original_len / 2;
             nibbles.truncate(new_len);
             prop_assert_eq!(nibbles.len(), new_len);
-            prop_assert_eq!(nibbles.as_slice(), &nibbles_data[..new_len]);
+            prop_assert_eq!(nibbles.to_vec(), &nibbles_data[..new_len]);
         }
 
         // Test truncating to same length (no-op)
         let mut nibbles = Nibbles::from_nibbles(&nibbles_data);
         nibbles.truncate(original_len);
         prop_assert_eq!(nibbles.len(), original_len);
-        prop_assert_eq!(nibbles.as_slice(), &nibbles_data[..]);
+        prop_assert_eq!(nibbles.to_vec(), &nibbles_data[..]);
     }
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
-    fn increment_properties(nibbles_data in vec(0u8..16, 1..32)) {
+    fn increment_properties(nibbles_data in vec(0u8..16, 1..=32)) {
         let nibbles = Nibbles::from_nibbles(&nibbles_data);
 
         if let Some(incremented) = nibbles.increment() {
@@ -249,8 +249,8 @@ proptest! {
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
     fn common_prefix_length_properties(
-        nibbles1 in vec(0u8..16, 0..64),
-        nibbles2 in vec(0u8..16, 0..64)
+        nibbles1 in vec(0u8..16, 0..=64),
+        nibbles2 in vec(0u8..16, 0..=64)
     ) {
         let n1 = Nibbles::from_nibbles(&nibbles1);
         let n2 = Nibbles::from_nibbles(&nibbles2);
@@ -279,31 +279,29 @@ proptest! {
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
-    fn has_prefix_consistency(nibbles_data in vec(0u8..16, 1..64)) {
+    fn starts_with_consistency(nibbles_data in vec(0u8..16, 1..=64)) {
         let nibbles = Nibbles::from_nibbles(&nibbles_data);
         let len = nibbles_data.len();
 
         // Test empty prefix
-        prop_assert!(nibbles.has_prefix(&[]));
-        prop_assert!(nibbles.starts_with(&[]));
+        prop_assert!(nibbles.starts_with(&Nibbles::default()));
 
         // Test full prefix
-        prop_assert!(nibbles.has_prefix(&nibbles_data));
-        prop_assert!(nibbles.starts_with(&nibbles_data));
+        prop_assert!(nibbles.starts_with(&nibbles));
 
         // Test first half prefix
         if len > 1 {
             let prefix_len = len / 2;
-            let prefix = &nibbles_data[..prefix_len];
-            prop_assert!(nibbles.has_prefix(prefix));
-            prop_assert!(nibbles.starts_with(prefix));
+            let prefix = nibbles.slice(..prefix_len);
+            prop_assert!(nibbles.starts_with(&prefix));
+            prop_assert!(nibbles.starts_with(&prefix));
 
             // Test with different prefix
             if prefix_len > 0 {
-                let mut different_prefix = prefix.to_vec();
-                different_prefix[0] = (different_prefix[0] + 1) % 16;
+                let mut different_prefix = prefix;
+                different_prefix.set_at(0, (different_prefix.get_unchecked(0) + 1) % 16);
                 if different_prefix != prefix {
-                    prop_assert!(!nibbles.has_prefix(&different_prefix));
+                    prop_assert!(!nibbles.starts_with(&different_prefix));
                 }
             }
         }
@@ -312,8 +310,8 @@ proptest! {
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
     fn ordering_properties(
-        nibbles1 in vec(0u8..16, 0..32),
-        nibbles2 in vec(0u8..16, 0..32)
+        nibbles1 in vec(0u8..16, 0..=32),
+        nibbles2 in vec(0u8..16, 0..=32)
     ) {
         let n1 = Nibbles::from_nibbles(&nibbles1);
         let n2 = Nibbles::from_nibbles(&nibbles2);
