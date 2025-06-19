@@ -86,7 +86,6 @@ static INCREMENT_VALUES: [U256; 65] = {
 #[repr(C)] // We want to preserve the order of fields in the memory layout.
 #[derive(Default, Clone, Copy, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Nibbles {
     /// Nibbles length.
     // This field goes first, because the derived implementation of `PartialEq` compares the fields
@@ -106,6 +105,17 @@ impl fmt::Debug for Nibbles {
             let shifted = self.nibbles >> ((NIBBLES - self.len()) * 4);
             write!(f, "Nibbles(0x{:0width$x})", shifted, width = self.len())
         }
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Nibbles {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let length = u.int_in_range(0..=NIBBLES)?;
+        let nibbles = Nibbles::from_nibbles_unchecked(
+            (0..length).map(|_| u.int_in_range(0..=0xf)).collect::<Result<Vec<_>, _>>()?,
+        );
+        Ok(nibbles)
     }
 }
 
