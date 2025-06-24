@@ -2,7 +2,7 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Through
 use nybbles::Nibbles;
 use proptest::{prelude::*, strategy::ValueTree};
 use std::{
-    collections::hash_map::RandomState,
+    collections::{hash_map::RandomState, HashMap},
     hash::{BuildHasher, Hash},
     hint::black_box,
     time::Duration,
@@ -529,6 +529,97 @@ pub fn bench_hash(c: &mut Criterion) {
     group.finish();
 }
 
+pub fn bench_hashmap(c: &mut Criterion) {
+    let mut group = c.benchmark_group("hashmap");
+
+    for size in SIZE_NIBBLES {
+        // Generate test data
+        let test_nibbles: Vec<Nibbles> = (0..100)
+            .map(|i| {
+                let data: Vec<u8> = (0..size).map(|j| ((i + j) % 16) as u8).collect();
+                Nibbles::from_nibbles(&data)
+            })
+            .collect();
+
+        group.throughput(Throughput::Elements(test_nibbles.len() as u64));
+
+        // Benchmark HashMap insertion with default hasher
+        group.bench_with_input(
+            BenchmarkId::new("insert_default", size),
+            &test_nibbles,
+            |b, nibbles| {
+                b.iter(|| {
+                    let mut map = HashMap::new();
+                    for (i, nibble) in nibbles.iter().enumerate() {
+                        map.insert(black_box(*nibble), black_box(i));
+                    }
+                    black_box(map)
+                })
+            },
+        );
+
+        // Benchmark HashMap insertion with foldhash
+        group.bench_with_input(
+            BenchmarkId::new("insert_foldhash", size),
+            &test_nibbles,
+            |b, nibbles| {
+                b.iter(|| {
+                    let mut map = HashMap::with_hasher(foldhash::fast::RandomState::default());
+                    for (i, nibble) in nibbles.iter().enumerate() {
+                        map.insert(black_box(*nibble), black_box(i));
+                    }
+                    black_box(map)
+                })
+            },
+        );
+
+        // Pre-create maps for lookup benchmarks
+        let mut default_map = HashMap::new();
+        let mut foldhash_map = HashMap::with_hasher(foldhash::fast::RandomState::default());
+        
+        for (i, nibble) in test_nibbles.iter().enumerate() {
+            default_map.insert(*nibble, i);
+            foldhash_map.insert(*nibble, i);
+        }
+
+        // Benchmark HashMap lookup with default hasher
+        group.bench_with_input(
+            BenchmarkId::new("lookup_default", size),
+            &(test_nibbles.clone(), default_map),
+            |b, (nibbles, map)| {
+                b.iter(|| {
+                    let mut sum = 0usize;
+                    for nibble in nibbles {
+                        if let Some(value) = map.get(nibble) {
+                            sum = sum.wrapping_add(*value);
+                        }
+                    }
+                    black_box(sum)
+                })
+            },
+        );
+
+        // Benchmark HashMap lookup with foldhash
+        group.bench_with_input(
+            BenchmarkId::new("lookup_foldhash", size),
+            &(test_nibbles, foldhash_map),
+            |b, (nibbles, map)| {
+                b.iter(|| {
+                    let mut sum = 0usize;
+                    for nibble in nibbles {
+                        if let Some(value) = map.get(nibble) {
+                            sum = sum.wrapping_add(*value);
+                        }
+                    }
+                    black_box(sum)
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     name = benches;
     config = Criterion::default()
@@ -537,7 +628,7 @@ criterion_group!(
     targets = bench_from_nibbles, bench_pack, bench_unpack, bench_push, bench_slice,
               bench_join, bench_extend, bench_set_at, bench_get_byte, bench_common_prefix_length,
               bench_cmp, bench_clone, bench_increment, bench_pop, bench_first, bench_last,
-              bench_starts_with, bench_ends_with, bench_truncate, bench_clear, bench_hash, nibbles_benchmark
+              bench_starts_with, bench_ends_with, bench_truncate, bench_clear, bench_hash, bench_hashmap, nibbles_benchmark
 );
 criterion_main!(benches);
 
