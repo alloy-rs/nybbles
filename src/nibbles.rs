@@ -90,7 +90,7 @@ pub struct Nibbles {
     /// Nibbles length.
     // This field goes first, because the derived implementation of `PartialEq` compares the fields
     // in order, so we can short-circuit the comparison if the `length` field differs.
-    pub(crate) length: usize,
+    pub(crate) length: u8,
     /// The nibbles themselves, stored as a 256-bit unsigned integer with most significant bits set
     /// first.
     pub(crate) nibbles: U256,
@@ -349,7 +349,7 @@ impl Nibbles {
             src = src.add(1);
         }
 
-        Self { length, nibbles }
+        Self { length: length as u8, nibbles }
     }
 
     /// Packs the nibbles into the given slice.
@@ -707,7 +707,7 @@ impl Nibbles {
     /// Returns the total number of nibbles in this [`Nibbles`].
     #[inline]
     pub const fn len(&self) -> usize {
-        let len = self.length;
+        let len = self.length as usize;
         debug_assert!(len <= 64);
         unsafe { core::hint::assert_unchecked(len <= 64) };
         len
@@ -760,7 +760,7 @@ impl Nibbles {
             }
         };
 
-        Self { length: nibble_len, nibbles }
+        Self { length: nibble_len as u8, nibbles }
     }
 
     /// Creates new nibbles containing the nibbles in the specified range.
@@ -877,7 +877,7 @@ impl Nibbles {
     /// Extend the current nibbles with another byte slice.
     pub fn extend_from_slice(&mut self, other: &[u8]) {
         assert!(
-            self.length + other.len() * 2 <= NIBBLES,
+            (self.length as usize) + other.len() * 2 <= NIBBLES,
             "Cannot extend: resulting length would exceed maximum capacity"
         );
         self.extend_from_slice_unchecked(other);
@@ -900,7 +900,7 @@ impl Nibbles {
             other <<= (U256::BYTES - len_bytes) * 8;
         }
         self.nibbles |= other >> self.bit_len();
-        self.length += len_bytes * 2;
+        self.length += (len_bytes * 2) as u8;
     }
 
     /// Truncates the current nibbles to the given length.
