@@ -2,7 +2,8 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Through
 use nybbles::Nibbles;
 use proptest::{prelude::*, strategy::ValueTree};
 use std::{
-    hash::{BuildHasher, Hash, Hasher},
+    collections::hash_map::RandomState,
+    hash::{BuildHasher, Hash},
     hint::black_box,
     time::Duration,
 };
@@ -508,6 +509,16 @@ pub fn bench_hash(c: &mut Criterion) {
             BenchmarkId::new("foldhash", size),
             &(nibbles, foldhash::fast::RandomState::default()),
             |b, &(nibbles, state)| {
+                b.iter(|| {
+                    black_box(nibbles).hash(&mut state.build_hasher());
+                })
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("default", size),
+            &(nibbles, RandomState::new()),
+            |b, &(nibbles, ref state)| {
                 b.iter(|| {
                     black_box(nibbles).hash(&mut state.build_hasher());
                 })
