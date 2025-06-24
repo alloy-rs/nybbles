@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use nybbles::Nibbles;
 use proptest::{prelude::*, strategy::ValueTree};
-use std::{collections::HashMap, hash::{Hash, Hasher}, hint::black_box, time::Duration};
+use std::{hash::{Hash, Hasher}, hint::black_box, time::Duration};
 use foldhash::fast::FoldHasher;
 
 const SIZE_NIBBLES: [usize; 4] = [8, 16, 32, 64];
@@ -525,42 +525,6 @@ pub fn bench_hash(c: &mut Criterion) {
             },
         );
 
-        // Benchmark with HashMap operations
-        group.bench_with_input(
-            BenchmarkId::new("hashmap_insert", size),
-            &test_nibbles,
-            |b, nibbles| {
-                b.iter(|| {
-                    let mut map = HashMap::new();
-                    for (i, nibble) in nibbles.iter().enumerate() {
-                        map.insert(black_box(*nibble), black_box(i));
-                    }
-                    black_box(map)
-                })
-            },
-        );
-
-        // Pre-create map for lookup benchmarks
-        let mut lookup_map = HashMap::new();
-        for (i, nibble) in test_nibbles.iter().enumerate() {
-            lookup_map.insert(*nibble, i);
-        }
-
-        group.bench_with_input(
-            BenchmarkId::new("hashmap_lookup", size),
-            &(test_nibbles, lookup_map),
-            |b, (nibbles, map)| {
-                b.iter(|| {
-                    let mut sum = 0usize;
-                    for nibble in nibbles {
-                        if let Some(value) = map.get(nibble) {
-                            sum = sum.wrapping_add(*value);
-                        }
-                    }
-                    black_box(sum)
-                })
-            },
-        );
     }
 
     group.finish();
