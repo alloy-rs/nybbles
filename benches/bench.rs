@@ -1,8 +1,11 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use nybbles::Nibbles;
 use proptest::{prelude::*, strategy::ValueTree};
-use std::{hash::{Hash, Hasher}, hint::black_box, time::Duration};
-use foldhash::fast::FoldHasher;
+use std::{
+    hash::{BuildHasher, Hash, Hasher},
+    hint::black_box,
+    time::Duration,
+};
 
 const SIZE_NIBBLES: [usize; 4] = [8, 16, 32, 64];
 const SIZE_BYTES: [usize; 4] = [4, 8, 16, 32];
@@ -499,32 +502,17 @@ pub fn bench_hash(c: &mut Criterion) {
     let mut group = c.benchmark_group("hash");
 
     for size in SIZE_NIBBLES {
-        let test_nibbles: Vec<Nibbles> = (0..100)
-            .map(|i| {
-                let data: Vec<u8> = (0..size).map(|j| ((i + j) % 16) as u8).collect();
-                Nibbles::from_nibbles(&data)
-            })
-            .collect();
+        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
 
-        group.throughput(Throughput::Elements(test_nibbles.len() as u64));
-
-        // Benchmark with FoldHasher (fast hash function)
         group.bench_with_input(
             BenchmarkId::new("foldhash", size),
-            &test_nibbles,
-            |b, nibbles| {
+            &(nibbles, foldhash::fast::RandomState::default()),
+            |b, &(nibbles, state)| {
                 b.iter(|| {
-                    let mut total_hash = 0u64;
-                    for nibble in nibbles {
-                        let mut hasher = FoldHasher::new();
-                        nibble.hash(&mut hasher);
-                        total_hash = total_hash.wrapping_add(hasher.finish());
-                    }
-                    black_box(total_hash)
+                    black_box(nibbles).hash(&mut state.build_hasher());
                 })
             },
         );
-
     }
 
     group.finish();
