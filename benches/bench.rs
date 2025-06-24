@@ -533,40 +533,29 @@ pub fn bench_hashmap(c: &mut Criterion) {
     let mut group = c.benchmark_group("hashmap");
 
     for size in SIZE_NIBBLES {
-        // Generate test data
-        let test_nibbles: Vec<Nibbles> = (0..100)
-            .map(|i| {
-                let data: Vec<u8> = (0..size).map(|j| ((i + j) % 16) as u8).collect();
-                Nibbles::from_nibbles(&data)
-            })
-            .collect();
-
-        group.throughput(Throughput::Elements(test_nibbles.len() as u64));
+        let nibbles =
+            (0..100).map(|_| Nibbles::from_nibbles(generate_nibbles(size))).collect::<Vec<_>>();
 
         // Benchmark HashMap insertion with default hasher
-        group.bench_with_input(
-            BenchmarkId::new("insert_default", size),
-            &test_nibbles,
-            |b, nibbles| {
-                b.iter(|| {
-                    let mut map = HashMap::new();
-                    for (i, nibble) in nibbles.iter().enumerate() {
-                        map.insert(black_box(*nibble), black_box(i));
-                    }
-                    black_box(map)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("insert_default", size), &nibbles, |b, nibbles| {
+            b.iter(|| {
+                let mut map = HashMap::new();
+                for (i, nibbles) in nibbles.iter().enumerate() {
+                    map.insert(black_box(*nibbles), black_box(i));
+                }
+                black_box(map)
+            })
+        });
 
         // Benchmark HashMap insertion with foldhash
         group.bench_with_input(
             BenchmarkId::new("insert_foldhash", size),
-            &test_nibbles,
+            &nibbles,
             |b, nibbles| {
                 b.iter(|| {
                     let mut map = HashMap::with_hasher(foldhash::fast::RandomState::default());
-                    for (i, nibble) in nibbles.iter().enumerate() {
-                        map.insert(black_box(*nibble), black_box(i));
+                    for (i, nibbles) in nibbles.iter().enumerate() {
+                        map.insert(black_box(*nibbles), black_box(i));
                     }
                     black_box(map)
                 })
@@ -576,8 +565,8 @@ pub fn bench_hashmap(c: &mut Criterion) {
         // Pre-create maps for lookup benchmarks
         let mut default_map = HashMap::new();
         let mut foldhash_map = HashMap::with_hasher(foldhash::fast::RandomState::default());
-        
-        for (i, nibble) in test_nibbles.iter().enumerate() {
+
+        for (i, nibble) in nibbles.iter().enumerate() {
             default_map.insert(*nibble, i);
             foldhash_map.insert(*nibble, i);
         }
@@ -585,12 +574,12 @@ pub fn bench_hashmap(c: &mut Criterion) {
         // Benchmark HashMap lookup with default hasher
         group.bench_with_input(
             BenchmarkId::new("lookup_default", size),
-            &(test_nibbles.clone(), default_map),
+            &(nibbles.clone(), default_map),
             |b, (nibbles, map)| {
                 b.iter(|| {
                     let mut sum = 0usize;
-                    for nibble in nibbles {
-                        if let Some(value) = map.get(nibble) {
+                    for nibbles in nibbles {
+                        if let Some(value) = map.get(nibbles) {
                             sum = sum.wrapping_add(*value);
                         }
                     }
@@ -602,12 +591,12 @@ pub fn bench_hashmap(c: &mut Criterion) {
         // Benchmark HashMap lookup with foldhash
         group.bench_with_input(
             BenchmarkId::new("lookup_foldhash", size),
-            &(test_nibbles, foldhash_map),
+            &(nibbles, foldhash_map),
             |b, (nibbles, map)| {
                 b.iter(|| {
                     let mut sum = 0usize;
-                    for nibble in nibbles {
-                        if let Some(value) = map.get(nibble) {
+                    for nibbles in nibbles {
+                        if let Some(value) = map.get(nibbles) {
                             sum = sum.wrapping_add(*value);
                         }
                     }
