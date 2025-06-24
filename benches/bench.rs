@@ -1,7 +1,8 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use nybbles::Nibbles;
 use proptest::{prelude::*, strategy::ValueTree};
-use std::{hint::black_box, time::Duration};
+use std::{collections::HashMap, hash::{Hash, Hasher}, hint::black_box, time::Duration};
+use foldhash::fast::FoldHasher;
 
 const SIZE_NIBBLES: [usize; 4] = [8, 16, 32, 64];
 const SIZE_BYTES: [usize; 4] = [4, 8, 16, 32];
@@ -494,6 +495,77 @@ fn pack_naive(bytes: &[u8]) -> Vec<u8> {
     chunks.map(|chunk| (chunk[0] << 4) | chunk[1]).chain(rem.iter().copied()).collect()
 }
 
+pub fn bench_hash(c: &mut Criterion) {
+    let mut group = c.benchmark_group("hash");
+
+    for size in SIZE_NIBBLES {
+        let test_nibbles: Vec<Nibbles> = (0..100)
+            .map(|i| {
+                let data: Vec<u8> = (0..size).map(|j| ((i + j) % 16) as u8).collect();
+                Nibbles::from_nibbles(&data)
+            })
+            .collect();
+
+        group.throughput(Throughput::Elements(test_nibbles.len() as u64));
+
+        // Benchmark with FoldHasher (fast hash function)
+        group.bench_with_input(
+            BenchmarkId::new("foldhash", size),
+            &test_nibbles,
+            |b, nibbles| {
+                b.iter(|| {
+                    let mut total_hash = 0u64;
+                    for nibble in nibbles {
+                        let mut hasher = FoldHasher::new();
+                        nibble.hash(&mut hasher);
+                        total_hash = total_hash.wrapping_add(hasher.finish());
+                    }
+                    black_box(total_hash)
+                })
+            },
+        );
+
+        // Benchmark with HashMap operations
+        group.bench_with_input(
+            BenchmarkId::new("hashmap_insert", size),
+            &test_nibbles,
+            |b, nibbles| {
+                b.iter(|| {
+                    let mut map = HashMap::new();
+                    for (i, nibble) in nibbles.iter().enumerate() {
+                        map.insert(black_box(*nibble), black_box(i));
+                    }
+                    black_box(map)
+                })
+            },
+        );
+
+        // Pre-create map for lookup benchmarks
+        let mut lookup_map = HashMap::new();
+        for (i, nibble) in test_nibbles.iter().enumerate() {
+            lookup_map.insert(*nibble, i);
+        }
+
+        group.bench_with_input(
+            BenchmarkId::new("hashmap_lookup", size),
+            &(test_nibbles, lookup_map),
+            |b, (nibbles, map)| {
+                b.iter(|| {
+                    let mut sum = 0usize;
+                    for nibble in nibbles {
+                        if let Some(value) = map.get(nibble) {
+                            sum = sum.wrapping_add(*value);
+                        }
+                    }
+                    black_box(sum)
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     name = benches;
     config = Criterion::default()
@@ -502,7 +574,7 @@ criterion_group!(
     targets = bench_from_nibbles, bench_pack, bench_unpack, bench_push, bench_slice,
               bench_join, bench_extend, bench_set_at, bench_get_byte, bench_common_prefix_length,
               bench_cmp, bench_clone, bench_increment, bench_pop, bench_first, bench_last,
-              bench_starts_with, bench_ends_with, bench_truncate, bench_clear, nibbles_benchmark
+              bench_starts_with, bench_ends_with, bench_truncate, bench_clear, bench_hash, nibbles_benchmark
 );
 criterion_main!(benches);
 
