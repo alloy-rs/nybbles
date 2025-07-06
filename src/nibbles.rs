@@ -336,12 +336,19 @@ impl Nibbles {
         let length = data.len() * 2;
         debug_assert!(length <= NIBBLES);
 
-        let mut nibbles = [0u8; 32];
+        cfg_if! {
+            if #[cfg(target_endian = "little")] {
+                let mut nibbles = U256::ZERO;
+                let nibbles_slice = nibbles.as_le_slice_mut();
+            } else {
+                let mut nibbles_slice = [0u8; 32];
+            }
+        }
 
         // Source pointer is at the beginning
         let mut src = data.as_ptr().cast::<u8>();
         // Move destination pointer to the end of the little endian slice
-        let mut dst = nibbles.as_mut_ptr().add(U256::BYTES);
+        let mut dst = nibbles_slice.as_mut_ptr().add(U256::BYTES);
         // On each iteration, decrement the destination pointer by one, set the destination
         // byte, and increment the source pointer by one
         for _ in 0..data.len() {
@@ -350,7 +357,13 @@ impl Nibbles {
             src = src.add(1);
         }
 
-        Self { length, nibbles: U256::from_le_bytes(nibbles) }
+        cfg_if! {
+            if #[cfg(target_endian = "big")] {
+                let nibbles = U256::from_le_bytes(nibbles_slice);
+            }
+        }
+
+        Self { length, nibbles }
     }
 
     /// Packs the nibbles into the given slice.
