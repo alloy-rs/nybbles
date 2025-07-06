@@ -18,6 +18,7 @@ smallvec = { version = "1.0", default-features = false, features = [
     "union",
 ] }
 ruint = { version = "1.15.0", default-features = false, features = ["alloc"] }
+cfg-if = "1.0"
 
 # serde
 serde = { version = "1.0", default-features = false, optional = true, features = [

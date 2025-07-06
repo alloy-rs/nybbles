@@ -54,6 +54,31 @@ jobs:
       - run: cargo test --all-features
         if: matrix.rust == 'nightly'
 
+  test-be:
+    name: Test Big-Endian
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [mips-unknown-linux-gnu, mips64-unknown-linux-gnuabi64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Enable type layout randomization
+        run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo build -Zbuild-std
+      - run: cargo test -Zbuild-std
+      - run: cargo build --no-default-features -Zbuild-std
+      - run: cargo test --no-default-features -Zbuild-std
+
   miri:
     name: miri ${{ matrix.flags }}
     runs-on: ubuntu-latest
