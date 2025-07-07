@@ -1,8 +1,9 @@
+use cfg_if::cfg_if;
 use core::{
     cmp::{self, Ordering},
     fmt,
     mem::MaybeUninit,
-    ops::{Bound, RangeBounds},
+    ops::{Bound, Deref, RangeBounds},
     slice,
 };
 use ruint::aliases::U256;
@@ -131,8 +132,8 @@ impl Ord for Nibbles {
 
         // Slice to the loop iteration range to enable bound check
         // elimination in the compiler
-        let lhs = &self.nibbles.as_le_slice()[U256::BYTES - l..];
-        let rhs = &other.nibbles.as_le_slice()[U256::BYTES - l..];
+        let lhs = &as_le_slice(&self.nibbles)[U256::BYTES - l..];
+        let rhs = &as_le_slice(&other.nibbles)[U256::BYTES - l..];
 
         for i in (0..l).rev() {
             match lhs[i].cmp(&rhs[i]) {
@@ -335,18 +336,31 @@ impl Nibbles {
         let length = data.len() * 2;
         debug_assert!(length <= NIBBLES);
 
-        let mut nibbles = U256::ZERO;
+        cfg_if! {
+            if #[cfg(target_endian = "little")] {
+                let mut nibbles = U256::ZERO;
+                let nibbles_slice = nibbles.as_le_slice_mut();
+            } else {
+                let mut nibbles_slice = [0u8; 32];
+            }
+        }
 
         // Source pointer is at the beginning
         let mut src = data.as_ptr().cast::<u8>();
         // Move destination pointer to the end of the little endian slice
-        let mut dst = nibbles.as_le_slice_mut().as_mut_ptr().add(U256::BYTES);
+        let mut dst = nibbles_slice.as_mut_ptr().add(U256::BYTES);
         // On each iteration, decrement the destination pointer by one, set the destination
         // byte, and increment the source pointer by one
         for _ in 0..data.len() {
             dst = dst.sub(1);
             *dst = *src;
             src = src.add(1);
+        }
+
+        cfg_if! {
+            if #[cfg(target_endian = "big")] {
+                let nibbles = U256::from_le_bytes(nibbles_slice);
+            }
         }
 
         Self { length, nibbles }
@@ -494,7 +508,7 @@ impl Nibbles {
     pub fn get_byte_unchecked(&self, i: usize) -> u8 {
         self.assert_index(i);
         if i % 2 == 0 {
-            self.nibbles.as_le_slice()[U256::BYTES - i / 2 - 1]
+            as_le_slice(&self.nibbles)[U256::BYTES - i / 2 - 1]
         } else {
             self.get_unchecked(i) << 4 | self.get_unchecked(i + 1)
         }
@@ -551,9 +565,9 @@ impl Nibbles {
 
         // Fast path for even-even and odd-odd sequences
         if self.len() % 2 == other.len() % 2 {
-            return self.nibbles.as_le_slice()
+            return as_le_slice(&self.nibbles)
                 [(NIBBLES - self.len()) / 2..(NIBBLES - self.len() + other.len()) / 2]
-                == other.nibbles.as_le_slice()[(NIBBLES - other.len()) / 2..];
+                == as_le_slice(&other.nibbles)[(NIBBLES - other.len()) / 2..];
         }
 
         let mut i = 0;
@@ -586,7 +600,7 @@ impl Nibbles {
     #[track_caller]
     pub fn get_unchecked(&self, i: usize) -> u8 {
         self.assert_index(i);
-        let byte = self.nibbles.as_le_slice()[U256::BYTES - i / 2 - 1];
+        let byte = as_le_slice(&self.nibbles)[U256::BYTES - i / 2 - 1];
         if i % 2 == 0 {
             byte >> 4
         } else {
@@ -615,12 +629,30 @@ impl Nibbles {
     #[inline]
     pub unsafe fn set_at_unchecked(&mut self, i: usize, value: u8) {
         let byte_index = U256::BYTES - i / 2 - 1;
+
         // SAFETY: index checked above
-        let byte = unsafe { &mut self.nibbles.as_le_slice_mut()[byte_index] };
+        cfg_if! {
+            if #[cfg(target_endian = "little")] {
+                let byte = unsafe { &mut self.nibbles.as_le_slice_mut()[byte_index] };
+            } else {
+                // Big-endian targets must first copy the nibbles to a little-endian slice.
+                // Underneath the hood, `as_le_slice` will perform a stack copy, and we
+                // replace the underlying `nibbles` after we've updated the given nibble.
+                let mut le_copy = as_le_slice(&self.nibbles);
+                let byte = &mut le_copy.to_mut()[byte_index];
+            }
+        }
+
         if i % 2 == 0 {
             *byte = *byte & 0x0f | value << 4;
         } else {
             *byte = *byte & 0xf0 | value;
+        }
+
+        // For big-endian targets, replace the underlying U256 with the mutated LE slice.
+        #[cfg(target_endian = "big")]
+        {
+            self.nibbles = U256::from_le_slice(&le_copy);
         }
     }
 
@@ -945,7 +977,7 @@ unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
     let byte_len = nibbles.len().div_ceil(2);
     debug_assert!(out.len() >= byte_len);
     // Move source pointer to the end of the little endian slice
-    let mut src = nibbles.nibbles.as_le_slice().as_ptr().add(U256::BYTES);
+    let mut src = as_le_slice(&nibbles.nibbles).as_ptr().add(U256::BYTES);
     // Destination pointer is at the beginning of the output slice
     let mut dst = out.as_mut_ptr().cast::<u8>();
     // On each iteration, decrement the source pointer by one, set the destination byte, and
@@ -1010,6 +1042,59 @@ const fn panic_invalid_nibbles() -> ! {
 #[cfg_attr(debug_assertions, track_caller)]
 fn panic_invalid_index(len: usize, i: usize) -> ! {
     panic!("index out of bounds: {i} for nibbles of length {len}");
+}
+
+/// Internal container for owned/borrowed byte slices.
+enum ByteContainer<'a, const N: usize> {
+    /// Borrowed variant holds a reference to a slice of bytes.
+    #[cfg_attr(target_endian = "big", allow(unused))]
+    Borrowed(&'a [u8]),
+    /// Owned variant holds a fixed-size array of bytes.
+    #[cfg_attr(target_endian = "little", allow(unused))]
+    Owned([u8; N]),
+}
+
+impl<'a, const N: usize> ByteContainer<'a, N> {
+    /// Returns a mutable reference to the underlying byte array, converting from borrowed to owned
+    /// if necessary.
+    ///
+    /// ## Panics
+    /// Panics if the current variant is `Borrowed` and the slice length is less than `N`.
+    #[cfg_attr(target_endian = "little", allow(unused))]
+    pub(crate) fn to_mut(&mut self) -> &mut [u8; N] {
+        match self {
+            ByteContainer::Borrowed(slice) => {
+                let mut array = [0u8; N];
+                array[..N].copy_from_slice(&slice[..N]);
+                *self = ByteContainer::Owned(array);
+                self.to_mut()
+            }
+            ByteContainer::Owned(ref mut array) => array,
+        }
+    }
+}
+
+impl<'a, const N: usize> Deref for ByteContainer<'a, N> {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            ByteContainer::Borrowed(slice) => slice,
+            ByteContainer::Owned(array) => array.as_slice(),
+        }
+    }
+}
+
+/// Returns a little-endian byte slice representation of the given [`U256`] value.
+#[inline]
+const fn as_le_slice(x: &U256) -> ByteContainer<'_, { U256::BYTES }> {
+    cfg_if! {
+        if #[cfg(target_endian = "little")] {
+            ByteContainer::Borrowed(x.as_le_slice())
+        } else {
+            ByteContainer::Owned(x.to_le_bytes())
+        }
+    }
 }
 
 #[cfg(test)]
