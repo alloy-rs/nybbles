@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.1) - 2025-07-07
+
+### Bug Fixes
+
+- Bump minimum ruint version ([#30](https://github.com/alloy-rs/nybbles/issues/30))
+
+### Features
+
+- Add back support for big-endian targets ([#32](https://github.com/alloy-rs/nybbles/issues/32))
+
 ## [0.4.0](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.0) - 2025-06-19
 
 ### Dependencies
@@ -14,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - Add missing benchmarks for performance-critical methods ([#22](https://github.com/alloy-rs/nybbles/issues/22))
+
+### Miscellaneous Tasks
+
+- Release 0.4.0
 
 ### Other
 
