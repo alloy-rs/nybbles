@@ -86,7 +86,6 @@ static INCREMENT_VALUES: [U256; 65] = {
 /// ```
 #[repr(C)] // We want to preserve the order of fields in the memory layout.
 #[derive(Default, Clone, Copy, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Nibbles {
     /// Nibbles length.
     // This field goes first, because the derived implementation of `PartialEq` compares the fields
@@ -191,6 +190,56 @@ impl proptest::arbitrary::Arbitrary for Nibbles {
     fn arbitrary_with(size: proptest::collection::SizeRange) -> Self::Strategy {
         use proptest::prelude::*;
         proptest::collection::vec(0x0..=0xf, size).prop_map(Self::from_nibbles_unchecked)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Nibbles {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if self.is_empty() {
+            serializer.serialize_str("0x")
+        } else {
+            let shifted = self.nibbles >> ((NIBBLES - self.len()) * 4);
+            let hex_str = format!("0x{:0width$x}", shifted, width = self.len());
+            serializer.serialize_str(&hex_str)
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Nibbles {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = <&str>::deserialize(deserializer)?;
+
+        // Check if string starts with "0x"
+        let hex_str =
+            s.strip_prefix("0x").ok_or_else(|| serde::de::Error::custom("missing 0x prefix"))?;
+
+        // Empty case
+        if hex_str.is_empty() {
+            return Ok(Self::new());
+        }
+
+        // Check length
+        if hex_str.len() > NIBBLES {
+            return Err(serde::de::Error::custom("hex string too long"));
+        }
+
+        // Parse each character as a nibble
+        let mut nibbles_vec = Vec::with_capacity(hex_str.len());
+        for ch in hex_str.chars() {
+            let nibble =
+                ch.to_digit(16).ok_or_else(|| serde::de::Error::custom("invalid hex character"))?;
+            nibbles_vec.push(nibble as u8);
+        }
+
+        Ok(Self::from_nibbles_unchecked(nibbles_vec))
     }
 }
 
@@ -1684,6 +1733,86 @@ mod tests {
                 let packed = nibbles.pack();
                 prop_assert_eq!(&packed[..], input);
             }
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    mod serde_tests {
+        use super::*;
+
+        #[test]
+        fn serde_empty() {
+            let nibbles = Nibbles::new();
+            let serialized = serde_json::to_string(&nibbles).unwrap();
+            assert_eq!(serialized, r#""0x""#);
+
+            let deserialized: Nibbles = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized, nibbles);
+        }
+
+        #[test]
+        fn serde_single_nibble() {
+            let nibbles = Nibbles::from_nibbles([0x5]);
+            let serialized = serde_json::to_string(&nibbles).unwrap();
+            assert_eq!(serialized, r#""0x5""#);
+
+            let deserialized: Nibbles = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized, nibbles);
+        }
+
+        #[test]
+        fn serde_multiple_nibbles() {
+            let nibbles = Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]);
+            let serialized = serde_json::to_string(&nibbles).unwrap();
+            assert_eq!(serialized, r#""0xabcd""#);
+
+            let deserialized: Nibbles = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized, nibbles);
+        }
+
+        #[test]
+        fn serde_leading_zeros() {
+            let nibbles = Nibbles::from_nibbles([0x0, 0x0, 0x1, 0x2]);
+            let serialized = serde_json::to_string(&nibbles).unwrap();
+            assert_eq!(serialized, r#""0x0012""#);
+
+            let deserialized: Nibbles = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized, nibbles);
+        }
+
+        #[test]
+        fn serde_max_nibbles() {
+            let nibbles = Nibbles::from_nibbles([0xF; 64]);
+            let serialized = serde_json::to_string(&nibbles).unwrap();
+            assert_eq!(
+                serialized,
+                r#""0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff""#
+            );
+
+            let deserialized: Nibbles = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized, nibbles);
+        }
+
+        #[test]
+        fn deserialize_missing_prefix() {
+            let result: Result<Nibbles, _> = serde_json::from_str(r#""abcd""#);
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("missing 0x prefix"));
+        }
+
+        #[test]
+        fn deserialize_invalid_hex() {
+            let result: Result<Nibbles, _> = serde_json::from_str(r#""0xghij""#);
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("invalid hex character"));
+        }
+
+        #[test]
+        fn deserialize_too_long() {
+            let too_long = format!(r#""0x{}""#, "f".repeat(65));
+            let result: Result<Nibbles, _> = serde_json::from_str(&too_long);
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("hex string too long"));
         }
     }
 }
