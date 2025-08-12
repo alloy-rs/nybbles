@@ -1004,13 +1004,7 @@ impl<'a> Iterator for NibblesIter<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current < self.nibbles.len() {
-            let nibble = self.nibbles.get_unchecked(self.current);
-            self.current += 1;
-            Some(nibble)
-        } else {
-            None
-        }
+        self.nibbles.get(self.current).inspect(|_| self.current += 1)
     }
 
     #[inline]
