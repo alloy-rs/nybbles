@@ -1030,8 +1030,8 @@ impl<'a> Iterator for NibblesIter<'a> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.nibbles.len() - self.current;
-        (remaining, Some(remaining))
+        let len = self.len();
+        (len, Some(len))
     }
 }
 
