@@ -611,17 +611,6 @@ impl Nibbles {
     #[track_caller]
     pub fn get_unchecked(&self, i: usize) -> u8 {
         self.assert_index(i);
-        self.get_checked(i)
-    }
-
-    /// Returns the nibble at the given index.
-    ///
-    /// Caution: This expects that the index is valid
-    ///
-    /// Panics if the index is out of bounds.
-    #[inline]
-    #[track_caller]
-    fn get_checked(&self, i: usize) -> u8 {
         let byte = as_le_slice(&self.nibbles)[U256::BYTES - i / 2 - 1];
         if i % 2 == 0 {
             byte >> 4
@@ -1016,7 +1005,7 @@ impl<'a> Iterator for NibblesIter<'a> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.current < self.nibbles.len() {
-            let nibble = self.nibbles.get_checked(self.current);
+            let nibble = self.nibbles.get_unchecked(self.current);
             self.current += 1;
             Some(nibble)
         } else {
