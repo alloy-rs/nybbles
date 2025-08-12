@@ -1752,7 +1752,7 @@ mod tests {
         assert_eq!(empty.iter().collect::<Vec<_>>(), vec![]);
 
         // Test basic iteration
-        let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
+        let nibbles = Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]);
         let collected: Vec<u8> = nibbles.iter().collect();
         assert_eq!(collected, vec![0x0A, 0x0B, 0x0C, 0x0D]);
 
@@ -1760,11 +1760,11 @@ mod tests {
         assert_eq!(nibbles.iter().collect::<Vec<_>>(), nibbles.to_vec());
 
         // Test single nibble
-        let single = Nibbles::from_nibbles(&[0x05]);
+        let single = Nibbles::from_nibbles([0x05]);
         assert_eq!(single.iter().collect::<Vec<_>>(), vec![0x05]);
 
         // Test odd number of nibbles
-        let odd = Nibbles::from_nibbles(&[0x01, 0x02, 0x03]);
+        let odd = Nibbles::from_nibbles([0x01, 0x02, 0x03]);
         assert_eq!(odd.iter().collect::<Vec<_>>(), vec![0x01, 0x02, 0x03]);
 
         // Test max length nibbles
@@ -1773,7 +1773,7 @@ mod tests {
         assert_eq!(max.iter().collect::<Vec<_>>(), max_nibbles);
 
         // Test iterator size_hint and len
-        let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
+        let nibbles = Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]);
         let mut iter = nibbles.iter();
         assert_eq!(iter.len(), 4);
         assert_eq!(iter.size_hint(), (4, Some(4)));
@@ -1793,7 +1793,7 @@ mod tests {
         assert_eq!(iter.next(), None);
 
         // Test cloning iterator
-        let nibbles = Nibbles::from_nibbles(&[0x01, 0x02, 0x03, 0x04]);
+        let nibbles = Nibbles::from_nibbles([0x01, 0x02, 0x03, 0x04]);
         let mut iter1 = nibbles.iter();
         iter1.next();
         let iter2 = iter1.clone();
