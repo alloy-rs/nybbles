@@ -458,11 +458,7 @@ impl Nibbles {
     /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     /// ```
     pub fn to_vec(&self) -> Vec<u8> {
-        let mut nibbles = Vec::with_capacity(self.len());
-        for i in 0..self.len() {
-            nibbles.push(self.get_checked(i));
-        }
-        nibbles
+        self.iter().collect()
     }
 
     /// Returns an iterator over the nibbles.
