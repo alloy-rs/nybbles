@@ -86,7 +86,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flags: ["--no-default-features", "", "--all-features"]
+        flags: ["--no-default-features", "", "--all-features", "--target mips64-unknown-linux-gnuabi64"]
     env:
       MIRIFLAGS: -Zmiri-strict-provenance
     steps:

@@ -1031,7 +1031,8 @@ unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
     let byte_len = nibbles.len().div_ceil(2);
     debug_assert!(out.len() >= byte_len);
     // Move source pointer to the end of the little endian slice
-    let mut src = as_le_slice(&nibbles.nibbles).as_ptr().add(U256::BYTES);
+    let sl = as_le_slice(&nibbles.nibbles);
+    let mut src = sl.as_ptr().add(U256::BYTES);
     // Destination pointer is at the beginning of the output slice
     let mut dst = out.as_mut_ptr().cast::<u8>();
     // On each iteration, decrement the source pointer by one, set the destination byte, and
