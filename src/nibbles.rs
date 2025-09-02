@@ -86,6 +86,7 @@ static INCREMENT_VALUES: [U256; 65] = {
 /// ```
 #[repr(C)] // We want to preserve the order of fields in the memory layout.
 #[derive(Default, Clone, Copy, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 pub struct Nibbles {
     /// Nibbles length.
     // This field goes first, because the derived implementation of `PartialEq` compares the fields
@@ -120,18 +121,6 @@ impl serde::Serialize for Nibbles {
             let shifted = self.nibbles >> ((NIBBLES - self.len()) * 4);
             serializer.serialize_str(&format!("0x{:0width$x}", shifted, width = self.len()))
         }
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for Nibbles {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        let nibbles = U256::from_str_radix(&s, 16).map_err(serde::de::Error::custom)?;
-        Ok(Nibbles::from_nibbles_unchecked(nibbles.to_be_bytes()))
     }
 }
 
