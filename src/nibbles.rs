@@ -131,7 +131,7 @@ impl<'de> serde::Deserialize<'de> for Nibbles {
     {
         let s = String::deserialize(deserializer)?;
         let nibbles = U256::from_str_radix(&s, 16).map_err(serde::de::Error::custom)?;
-        Ok(Nibbles::from_nibbles_unchecked(nibbles.to_bytes_be()))
+        Ok(Nibbles::from_nibbles_unchecked(nibbles.to_be_bytes()))
     }
 }
 
