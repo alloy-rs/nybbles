@@ -231,15 +231,16 @@ impl<'de> serde::Deserialize<'de> for Nibbles {
             return Err(serde::de::Error::custom("hex string too long"));
         }
 
-        // Parse each character as a nibble
-        let mut nibbles_vec = Vec::with_capacity(hex_str.len());
+        // Check that all characters are valid hex characters. We do this once ahead of time so we
+        // can pass an iter into [`Self::from_iter_unchecked`], saving a Vec alloc.
         for ch in hex_str.chars() {
-            let nibble =
+            let _ =
                 ch.to_digit(16).ok_or_else(|| serde::de::Error::custom("invalid hex character"))?;
-            nibbles_vec.push(nibble as u8);
         }
 
-        Ok(Self::from_nibbles_unchecked(nibbles_vec))
+        let iter =
+            hex_str.chars().into_iter().map(|ch| ch.to_digit(16).expect("already validated") as u8);
+        Ok(Self::from_iter_unchecked(iter))
     }
 }
 
