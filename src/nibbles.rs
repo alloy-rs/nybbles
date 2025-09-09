@@ -238,8 +238,7 @@ impl<'de> serde::Deserialize<'de> for Nibbles {
                 ch.to_digit(16).ok_or_else(|| serde::de::Error::custom("invalid hex character"))?;
         }
 
-        let iter =
-            hex_str.chars().into_iter().map(|ch| ch.to_digit(16).expect("already validated") as u8);
+        let iter = hex_str.chars().map(|ch| ch.to_digit(16).expect("already validated") as u8);
         Ok(Self::from_iter_unchecked(iter))
     }
 }
