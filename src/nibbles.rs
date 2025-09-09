@@ -1778,7 +1778,7 @@ mod tests {
     fn iter() {
         // Test empty nibbles
         let empty = Nibbles::new();
-        assert_eq!(empty.iter().collect::<Vec<_>>(), vec![]);
+        assert!(empty.iter().collect::<Vec<_>>().is_empty());
 
         // Test basic iteration
         let nibbles = Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]);
@@ -1877,6 +1877,16 @@ mod tests {
             let nibbles = Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]);
             let serialized = serde_json::to_string(&nibbles).unwrap();
             assert_eq!(serialized, r#""0xabcd""#);
+
+            let deserialized: Nibbles = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized, nibbles);
+        }
+
+        #[test]
+        fn serde_odd_nibbles() {
+            let nibbles = Nibbles::from_nibbles([0x0A, 0x0B, 0x0C]);
+            let serialized = serde_json::to_string(&nibbles).unwrap();
+            assert_eq!(serialized, r#""0xabc""#);
 
             let deserialized: Nibbles = serde_json::from_str(&serialized).unwrap();
             assert_eq!(deserialized, nibbles);
