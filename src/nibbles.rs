@@ -507,11 +507,22 @@ impl Nibbles {
     /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     /// ```
     pub fn to_vec(&self) -> Vec<u8> {
-        let mut nibbles = Vec::with_capacity(self.len());
-        for i in 0..self.len() {
-            nibbles.push(self.get_unchecked(i));
-        }
-        nibbles
+        self.iter().collect()
+    }
+
+    /// Returns an iterator over the nibbles.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
+    /// let collected: Vec<u8> = nibbles.iter().collect();
+    /// assert_eq!(collected, vec![0x0A, 0x0B, 0x0C, 0x0D]);
+    /// ```
+    #[inline]
+    pub const fn iter(&self) -> NibblesIter<'_> {
+        NibblesIter { current: 0, nibbles: self }
     }
 
     /// Gets the byte at the given index by combining two consecutive nibbles.
@@ -1016,6 +1027,49 @@ impl Nibbles {
     }
 }
 
+/// Iterator over individual nibbles within a [`Nibbles`] structure.
+///
+/// This iterator provides efficient access to each nibble in sequence,
+/// using unchecked access for performance.
+///
+/// # Examples
+///
+/// ```
+/// # use nybbles::Nibbles;
+/// let nibbles = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0D]);
+/// let collected: Vec<u8> = nibbles.iter().collect();
+/// assert_eq!(collected, vec![0x0A, 0x0B, 0x0C, 0x0D]);
+/// ```
+#[derive(Debug, Clone)]
+pub struct NibblesIter<'a> {
+    /// Current position in the iteration.
+    current: usize,
+    /// Reference to the nibbles being iterated over.
+    nibbles: &'a Nibbles,
+}
+
+impl<'a> Iterator for NibblesIter<'a> {
+    type Item = u8;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.nibbles.get(self.current).inspect(|_| self.current += 1)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl<'a> ExactSizeIterator for NibblesIter<'a> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.nibbles.len() - self.current
+    }
+}
+
 /// Packs the nibbles into the given slice without checking its length.
 ///
 /// # Safety
@@ -1026,7 +1080,8 @@ unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
     let byte_len = nibbles.len().div_ceil(2);
     debug_assert!(out.len() >= byte_len);
     // Move source pointer to the end of the little endian slice
-    let mut src = as_le_slice(&nibbles.nibbles).as_ptr().add(U256::BYTES);
+    let sl = as_le_slice(&nibbles.nibbles);
+    let mut src = sl.as_ptr().add(U256::BYTES);
     // Destination pointer is at the beginning of the output slice
     let mut dst = out.as_mut_ptr().cast::<u8>();
     // On each iteration, decrement the source pointer by one, set the destination byte, and
@@ -1717,6 +1772,63 @@ mod tests {
             Nibbles::from_nibbles([0x1, 0x2, 0x3, 0xF, 0xF]).increment().unwrap(),
             Nibbles::from_nibbles([0x1, 0x2, 0x4, 0x0, 0x0])
         );
+    }
+
+    #[test]
+    fn iter() {
+        // Test empty nibbles
+        let empty = Nibbles::new();
+        assert_eq!(empty.iter().collect::<Vec<_>>(), vec![]);
+
+        // Test basic iteration
+        let nibbles = Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]);
+        let collected: Vec<u8> = nibbles.iter().collect();
+        assert_eq!(collected, vec![0x0A, 0x0B, 0x0C, 0x0D]);
+
+        // Test that iter() produces same result as to_vec()
+        assert_eq!(nibbles.iter().collect::<Vec<_>>(), nibbles.to_vec());
+
+        // Test single nibble
+        let single = Nibbles::from_nibbles([0x05]);
+        assert_eq!(single.iter().collect::<Vec<_>>(), vec![0x05]);
+
+        // Test odd number of nibbles
+        let odd = Nibbles::from_nibbles([0x01, 0x02, 0x03]);
+        assert_eq!(odd.iter().collect::<Vec<_>>(), vec![0x01, 0x02, 0x03]);
+
+        // Test max length nibbles
+        let max_nibbles: Vec<u8> = (0..64).map(|i| (i % 16) as u8).collect();
+        let max = Nibbles::from_nibbles(&max_nibbles);
+        assert_eq!(max.iter().collect::<Vec<_>>(), max_nibbles);
+
+        // Test iterator size_hint and len
+        let nibbles = Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]);
+        let mut iter = nibbles.iter();
+        assert_eq!(iter.len(), 4);
+        assert_eq!(iter.size_hint(), (4, Some(4)));
+
+        iter.next();
+        assert_eq!(iter.len(), 3);
+        assert_eq!(iter.size_hint(), (3, Some(3)));
+
+        iter.next();
+        iter.next();
+        assert_eq!(iter.len(), 1);
+        assert_eq!(iter.size_hint(), (1, Some(1)));
+
+        iter.next();
+        assert_eq!(iter.len(), 0);
+        assert_eq!(iter.size_hint(), (0, Some(0)));
+        assert_eq!(iter.next(), None);
+
+        // Test cloning iterator
+        let nibbles = Nibbles::from_nibbles([0x01, 0x02, 0x03, 0x04]);
+        let mut iter1 = nibbles.iter();
+        iter1.next();
+        let iter2 = iter1.clone();
+
+        assert_eq!(iter1.collect::<Vec<_>>(), vec![0x02, 0x03, 0x04]);
+        assert_eq!(iter2.collect::<Vec<_>>(), vec![0x02, 0x03, 0x04]);
     }
 
     #[cfg(feature = "arbitrary")]
