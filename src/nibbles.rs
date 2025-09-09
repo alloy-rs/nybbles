@@ -1851,6 +1851,7 @@ mod tests {
     #[cfg(feature = "serde")]
     mod serde_tests {
         use super::*;
+        use crate::alloc::string::ToString;
 
         #[test]
         fn serde_empty() {
