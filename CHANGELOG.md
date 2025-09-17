@@ -5,11 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.5) - 2025-09-17
+
+### Bug Fixes
+
+- Nibbles deserialize ([#37](https://github.com/alloy-rs/nybbles/issues/37))
+
 ## [0.4.4](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.4) - 2025-09-09
 
 ### Bug Fixes
 
 - Serde serialize/deserialize ([#36](https://github.com/alloy-rs/nybbles/issues/36))
+
+### Miscellaneous Tasks
+
+- Release 0.4.4
 
 ## [0.4.3](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.3) - 2025-08-15
 
