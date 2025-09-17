@@ -215,7 +215,7 @@ impl<'de> serde::Deserialize<'de> for Nibbles {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = <&str>::deserialize(deserializer)?;
+        let s = alloc::borrow::Cow::<str>::deserialize(deserializer)?;
 
         // Check if string starts with "0x"
         let hex_str =
@@ -1936,6 +1936,29 @@ mod tests {
             let result: Result<Nibbles, _> = serde_json::from_str(&too_long);
             assert!(result.is_err());
             assert!(result.unwrap_err().to_string().contains("hex string too long"));
+        }
+
+        #[test]
+        fn serde_from_object() {
+            // Test deserializing when the Nibbles is embedded in an object
+            #[derive(serde::Serialize, serde::Deserialize)]
+            struct TestStruct {
+                nibbles: Nibbles,
+            }
+
+            let original = TestStruct { nibbles: Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]) };
+            let json = serde_json::to_string(&original).unwrap();
+            let deserialized: TestStruct = serde_json::from_str(&json).unwrap();
+            assert_eq!(deserialized.nibbles, original.nibbles);
+        }
+
+        #[test]
+        fn serde_from_parsed_value() {
+            // Test deserializing from a pre-parsed JSON value
+            let json_str = r#"{"nibbles": "0xabcd"}"#;
+            let value: serde_json::Value = serde_json::from_str(json_str).unwrap();
+            let nibbles: Nibbles = serde_json::from_value(value["nibbles"].clone()).unwrap();
+            assert_eq!(nibbles, Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D]));
         }
     }
 }
