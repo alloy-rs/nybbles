@@ -5,6 +5,7 @@ use core::{
     mem::MaybeUninit,
     ops::{Bound, Deref, RangeBounds},
     slice,
+    str::FromStr,
 };
 use ruint::aliases::U256;
 use smallvec::SmallVec;
@@ -161,6 +162,34 @@ impl FromIterator<u8> for Nibbles {
     }
 }
 
+impl FromStr for Nibbles {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Check if string starts with "0x"
+        let hex_str = s.strip_prefix("0x").ok_or("missing 0x prefix")?;
+
+        // Empty case
+        if hex_str.is_empty() {
+            return Ok(Self::new());
+        }
+
+        // Check length
+        if hex_str.len() > NIBBLES {
+            return Err("hex string too long");
+        }
+
+        // Check that all characters are valid hex characters. We do this once ahead of time so we
+        // can pass an iter into [`Self::from_iter_unchecked`], saving a Vec alloc.
+        for ch in hex_str.chars() {
+            let _ = ch.to_digit(16).ok_or("invalid hex character")?;
+        }
+
+        let iter = hex_str.chars().map(|ch| ch.to_digit(16).expect("already validated") as u8);
+        Ok(Self::from_iter_unchecked(iter))
+    }
+}
+
 #[cfg(feature = "rlp")]
 impl alloy_rlp::Encodable for Nibbles {
     #[inline]
@@ -216,30 +245,7 @@ impl<'de> serde::Deserialize<'de> for Nibbles {
         D: serde::Deserializer<'de>,
     {
         let s = alloc::borrow::Cow::<str>::deserialize(deserializer)?;
-
-        // Check if string starts with "0x"
-        let hex_str =
-            s.strip_prefix("0x").ok_or_else(|| serde::de::Error::custom("missing 0x prefix"))?;
-
-        // Empty case
-        if hex_str.is_empty() {
-            return Ok(Self::new());
-        }
-
-        // Check length
-        if hex_str.len() > NIBBLES {
-            return Err(serde::de::Error::custom("hex string too long"));
-        }
-
-        // Check that all characters are valid hex characters. We do this once ahead of time so we
-        // can pass an iter into [`Self::from_iter_unchecked`], saving a Vec alloc.
-        for ch in hex_str.chars() {
-            let _ =
-                ch.to_digit(16).ok_or_else(|| serde::de::Error::custom("invalid hex character"))?;
-        }
-
-        let iter = hex_str.chars().map(|ch| ch.to_digit(16).expect("already validated") as u8);
-        Ok(Self::from_iter_unchecked(iter))
+        Self::from_str(s).map_err(serde::de::Error::custom)
     }
 }
 
@@ -1771,6 +1777,59 @@ mod tests {
         assert_eq!(
             Nibbles::from_nibbles([0x1, 0x2, 0x3, 0xF, 0xF]).increment().unwrap(),
             Nibbles::from_nibbles([0x1, 0x2, 0x4, 0x0, 0x0])
+        );
+    }
+
+    #[test]
+    fn from_str() {
+        // Test empty string
+        assert_eq!(Nibbles::from_str("0x").unwrap(), Nibbles::new());
+
+        // Test single nibble
+        assert_eq!(Nibbles::from_str("0x5").unwrap(), Nibbles::from_nibbles([0x5]));
+
+        // Test multiple nibbles
+        assert_eq!(
+            Nibbles::from_str("0xabcd").unwrap(),
+            Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D])
+        );
+
+        // Test odd nibbles
+        assert_eq!(
+            Nibbles::from_str("0xabc").unwrap(),
+            Nibbles::from_nibbles([0x0A, 0x0B, 0x0C])
+        );
+
+        // Test leading zeros
+        assert_eq!(
+            Nibbles::from_str("0x0012").unwrap(),
+            Nibbles::from_nibbles([0x0, 0x0, 0x1, 0x2])
+        );
+
+        // Test max nibbles
+        let hex_str = format!("0x{}", "f".repeat(64));
+        assert_eq!(Nibbles::from_str(&hex_str).unwrap(), Nibbles::from_nibbles([0xF; 64]));
+
+        // Test missing prefix
+        assert_eq!(Nibbles::from_str("abcd").unwrap_err(), "missing 0x prefix");
+
+        // Test invalid hex character
+        assert_eq!(Nibbles::from_str("0xghij").unwrap_err(), "invalid hex character");
+
+        // Test too long
+        let too_long = format!("0x{}", "f".repeat(65));
+        assert_eq!(Nibbles::from_str(&too_long).unwrap_err(), "hex string too long");
+
+        // Test uppercase hex characters
+        assert_eq!(
+            Nibbles::from_str("0xABCD").unwrap(),
+            Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D])
+        );
+
+        // Test mixed case
+        assert_eq!(
+            Nibbles::from_str("0xAbCd").unwrap(),
+            Nibbles::from_nibbles([0x0A, 0x0B, 0x0C, 0x0D])
         );
     }
 
