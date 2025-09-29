@@ -5,11 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.6](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.6) - 2025-09-29
+
+### Dependencies
+
+- Fix CI errors ([#39](https://github.com/alloy-rs/nybbles/issues/39))
+
+### Features
+
+- Implement FromStr ([#38](https://github.com/alloy-rs/nybbles/issues/38))
+
 ## [0.4.5](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.5) - 2025-09-17
 
 ### Bug Fixes
 
 - Nibbles deserialize ([#37](https://github.com/alloy-rs/nybbles/issues/37))
+
+### Miscellaneous Tasks
+
+- Release 0.4.5
 
 ## [0.4.4](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.4) - 2025-09-09
 
