@@ -1785,10 +1785,7 @@ mod tests {
         );
 
         // Test odd nibbles
-        assert_eq!(
-            Nibbles::from_str("0xabc").unwrap(),
-            Nibbles::from_nibbles([0x0A, 0x0B, 0x0C])
-        );
+        assert_eq!(Nibbles::from_str("0xabc").unwrap(), Nibbles::from_nibbles([0x0A, 0x0B, 0x0C]));
 
         // Test leading zeros
         assert_eq!(
