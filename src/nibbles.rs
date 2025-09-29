@@ -388,7 +388,7 @@ impl Nibbles {
         cfg_if! {
             if #[cfg(target_endian = "little")] {
                 let mut nibbles = U256::ZERO;
-                let nibbles_slice = nibbles.as_le_slice_mut();
+                let nibbles_slice = unsafe { nibbles.as_le_slice_mut() };
             } else {
                 let mut nibbles_slice = [0u8; 32];
             }
@@ -397,13 +397,15 @@ impl Nibbles {
         // Source pointer is at the beginning
         let mut src = data.as_ptr().cast::<u8>();
         // Move destination pointer to the end of the little endian slice
-        let mut dst = nibbles_slice.as_mut_ptr().add(U256::BYTES);
+        let mut dst = unsafe { nibbles_slice.as_mut_ptr().add(U256::BYTES) };
         // On each iteration, decrement the destination pointer by one, set the destination
         // byte, and increment the source pointer by one
         for _ in 0..data.len() {
-            dst = dst.sub(1);
-            *dst = *src;
-            src = src.add(1);
+            unsafe {
+                dst = dst.sub(1);
+                *dst = *src;
+                src = src.add(1);
+            }
         }
 
         cfg_if! {
@@ -481,8 +483,10 @@ impl Nibbles {
     /// ```
     #[inline]
     pub unsafe fn pack_to_unchecked(&self, ptr: *mut u8) {
-        let slice = slice::from_raw_parts_mut(ptr.cast(), self.len().div_ceil(2));
-        pack_to_unchecked(self, slice);
+        unsafe {
+            let slice = slice::from_raw_parts_mut(ptr.cast(), self.len().div_ceil(2));
+            pack_to_unchecked(self, slice);
+        }
     }
 
     /// Packs the nibbles into the given slice without checking its length.
@@ -494,7 +498,7 @@ impl Nibbles {
     /// `out` must be valid for at least `(self.len() + 1) / 2` bytes.
     #[inline]
     pub unsafe fn pack_to_slice_unchecked(&self, out: &mut [MaybeUninit<u8>]) {
-        pack_to_unchecked(self, out)
+        unsafe { pack_to_unchecked(self, out) }
     }
 
     /// Converts the nibbles into a vector of nibbles.
@@ -644,11 +648,7 @@ impl Nibbles {
     /// Returns the nibble at the given index.
     #[inline]
     pub fn get(&self, i: usize) -> Option<u8> {
-        if self.check_index(i) {
-            Some(self.get_unchecked(i))
-        } else {
-            None
-        }
+        if self.check_index(i) { Some(self.get_unchecked(i)) } else { None }
     }
 
     /// Returns the nibble at the given index.
@@ -661,11 +661,7 @@ impl Nibbles {
     pub fn get_unchecked(&self, i: usize) -> u8 {
         self.assert_index(i);
         let byte = as_le_slice(&self.nibbles)[U256::BYTES - i / 2 - 1];
-        if i % 2 == 0 {
-            byte >> 4
-        } else {
-            byte & 0x0F
-        }
+        if i % 2 == 0 { byte >> 4 } else { byte & 0x0F }
     }
 
     /// Sets the nibble at the given index.
@@ -726,11 +722,7 @@ impl Nibbles {
     #[inline]
     pub fn last(&self) -> Option<u8> {
         let len = self.len();
-        if len == 0 {
-            None
-        } else {
-            Some(self.get_unchecked(len - 1))
-        }
+        if len == 0 { None } else { Some(self.get_unchecked(len - 1)) }
     }
 
     /// Returns the length of the common prefix between this nibble sequence and the given.
@@ -777,11 +769,7 @@ impl Nibbles {
             (self.nibbles ^ other.nibbles) & mask
         };
 
-        if xor == U256::ZERO {
-            min_nibble_len
-        } else {
-            xor.leading_zeros() / 4
-        }
+        if xor == U256::ZERO { min_nibble_len } else { xor.leading_zeros() / 4 }
     }
 
     /// Returns the total number of bits in this [`Nibbles`].
@@ -810,7 +798,7 @@ impl Nibbles {
     /// Note that it is possible to create invalid [`Nibbles`] instances using this method. See
     /// [the type docs](Self) for more details.
     #[inline]
-    pub fn as_mut_uint_unchecked(&mut self) -> &mut U256 {
+    pub const fn as_mut_uint_unchecked(&mut self) -> &mut U256 {
         &mut self.nibbles
     }
 
@@ -906,7 +894,7 @@ impl Nibbles {
     /// Note that only the low nibble of the byte is used. For example, for byte `0x12`, only the
     /// nibble `0x2` is pushed.
     #[inline]
-    pub fn push_unchecked(&mut self, nibble: u8) {
+    pub const fn push_unchecked(&mut self, nibble: u8) {
         let nibble_val = (nibble & 0x0F) as u64;
         if nibble_val == 0 {
             // Nothing to do, limb nibbles are already set to zero by default
@@ -1007,7 +995,7 @@ impl Nibbles {
 
     /// Clears the current nibbles.
     #[inline]
-    pub fn clear(&mut self) {
+    pub const fn clear(&mut self) {
         *self = Self::new();
     }
 
@@ -1081,15 +1069,17 @@ unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
     debug_assert!(out.len() >= byte_len);
     // Move source pointer to the end of the little endian slice
     let sl = as_le_slice(&nibbles.nibbles);
-    let mut src = sl.as_ptr().add(U256::BYTES);
+    let mut src = unsafe { sl.as_ptr().add(U256::BYTES) };
     // Destination pointer is at the beginning of the output slice
     let mut dst = out.as_mut_ptr().cast::<u8>();
     // On each iteration, decrement the source pointer by one, set the destination byte, and
     // increment the destination pointer by one
     for _ in 0..byte_len {
-        src = src.sub(1);
-        *dst = *src;
-        dst = dst.add(1);
+        unsafe {
+            src = src.sub(1);
+            *dst = *src;
+            dst = dst.add(1);
+        }
     }
 }
 
@@ -1105,7 +1095,7 @@ pub unsafe fn smallvec_with<const N: usize>(
     len: usize,
     f: impl FnOnce(&mut [MaybeUninit<u8>]),
 ) -> SmallVec<[u8; N]> {
-    let mut buf = smallvec_with_len::<N>(len);
+    let mut buf = unsafe { smallvec_with_len::<N>(len) };
     f(unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), len) });
     buf
 }
@@ -1114,7 +1104,7 @@ pub unsafe fn smallvec_with<const N: usize>(
 #[allow(clippy::uninit_vec)]
 unsafe fn smallvec_with_len<const N: usize>(len: usize) -> SmallVec<[u8; N]> {
     if likely(len <= N) {
-        SmallVec::from_buf_and_len_unchecked(MaybeUninit::<[u8; N]>::uninit(), len)
+        unsafe { SmallVec::from_buf_and_len_unchecked(MaybeUninit::<[u8; N]>::uninit(), len) }
     } else {
         let mut vec = Vec::with_capacity(len);
         unsafe { vec.set_len(len) };
@@ -1173,7 +1163,7 @@ impl<'a, const N: usize> ByteContainer<'a, N> {
                 *self = ByteContainer::Owned(array);
                 self.to_mut()
             }
-            ByteContainer::Owned(ref mut array) => array,
+            ByteContainer::Owned(array) => array,
         }
     }
 }
