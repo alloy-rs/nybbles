@@ -894,7 +894,8 @@ impl Nibbles {
     /// Note that only the low nibble of the byte is used. For example, for byte `0x12`, only the
     /// nibble `0x2` is pushed.
     #[inline]
-    pub const fn push_unchecked(&mut self, nibble: u8) {
+    #[expect(clippy::missing_const_for_fn)]
+    pub fn push_unchecked(&mut self, nibble: u8) {
         let nibble_val = (nibble & 0x0F) as u64;
         if nibble_val == 0 {
             // Nothing to do, limb nibbles are already set to zero by default
