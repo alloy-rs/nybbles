@@ -245,7 +245,7 @@ impl<'de> serde::Deserialize<'de> for Nibbles {
         D: serde::Deserializer<'de>,
     {
         let s = alloc::borrow::Cow::<str>::deserialize(deserializer)?;
-        Self::from_str(s).map_err(serde::de::Error::custom)
+        Self::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 
