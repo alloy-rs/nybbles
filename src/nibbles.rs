@@ -822,6 +822,36 @@ impl Nibbles {
         &mut self.nibbles
     }
 
+    /// Returns the next nibble sequence in lexicographical order that is not a prefix of `self`.
+    ///
+    /// Returns `None` if the nibbles are empty or if no such value exists (all nibbles are 0xF).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use nybbles::Nibbles;
+    ///
+    /// let nibbles = Nibbles::from_nibbles([0x1, 0x2, 0x3]);
+    /// assert_eq!(nibbles.next_without_prefix(), Some(Nibbles::from_nibbles([0x1, 0x2, 0x4])));
+    ///
+    /// let nibbles = Nibbles::from_nibbles([0x0, 0x0, 0xF]);
+    /// assert_eq!(nibbles.next_without_prefix(), Some(Nibbles::from_nibbles([0x0, 0x1])));
+    ///
+    /// let nibbles = Nibbles::from_nibbles([0xF, 0xF, 0xF]);
+    /// assert_eq!(nibbles.next_without_prefix(), None);
+    /// ```
+    #[inline]
+    pub fn next_without_prefix(&self) -> Option<Self> {
+        let result = self.increment().unwrap_or_default();
+        if result.is_zeroes() {
+            return None;
+        }
+
+        // get position of last non-zero Nibble
+        let trailing = 64 - (result.nibbles.trailing_zeros() / 4);
+        Some(result.slice_unchecked(0, trailing))
+    }
+
     /// Creates new nibbles containing the nibbles in the specified range `[start, end)`
     /// without checking bounds.
     ///
@@ -1650,6 +1680,29 @@ mod tests {
         let mut nibbles = Nibbles::from_nibbles([5, 6, 7, 8]);
         nibbles.truncate(1);
         assert_eq!(nibbles, Nibbles::from_nibbles([5]));
+    }
+
+    #[test]
+    fn next_without_prefix() {
+        let test_cases: Vec<(Nibbles, Option<Nibbles>)> = vec![
+            // Simple increment, with no trailing zeros
+            (Nibbles::from_nibbles([0x1, 0x2, 0x3]), Some(Nibbles::from_nibbles([0x1, 0x2, 0x4]))),
+            // Trailing zeros
+            (Nibbles::from_nibbles([0x0, 0x0, 0xF]), Some(Nibbles::from_nibbles([0x0, 0x1]))),
+            (Nibbles::from_nibbles([0x0, 0xF, 0xF]), Some(Nibbles::from_nibbles([0x1]))),
+            (Nibbles::from_nibbles([0xE, 0xF, 0xF]), Some(Nibbles::from_nibbles([0xF]))),
+            (Nibbles::from_nibbles([0x1, 0x2, 0xF, 0xF]), Some(Nibbles::from_nibbles([0x1, 0x3]))),
+            // Other Cases
+            (Nibbles::from_nibbles([0xF; 64]), None),
+            (Nibbles::from_nibbles([0xF]), None),
+            (Nibbles::new(), None),
+            (Nibbles::from_nibbles([0x0, 0xF, 0xF, 0xF, 0xF]), Some(Nibbles::from_nibbles([0x1]))),
+        ];
+
+        for (input, expected) in test_cases {
+            let result = input.next_without_prefix();
+            assert_eq!(result, expected, "Failed for input: {:?}", input);
+        }
     }
 
     #[test]
