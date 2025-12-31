@@ -847,9 +847,9 @@ impl Nibbles {
             return None;
         }
 
-        // get position of last non-zero Nibble
-        let trailing = 64 - (result.nibbles.trailing_zeros() / 4);
-        Some(result.slice_unchecked(0, trailing))
+        // truncate to position of last non-zero Nibble
+        let length = NIBBLES - (result.nibbles.trailing_zeros() / 4);
+        Some(Self { length, nibbles: result.nibbles })
     }
 
     /// Creates new nibbles containing the nibbles in the specified range `[start, end)`
