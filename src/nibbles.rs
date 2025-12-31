@@ -801,7 +801,7 @@ impl Nibbles {
     /// Returns `true` if all nibbles in this [`Nibbles`] are zero.
     #[inline]
     pub fn is_zeroes(&self) -> bool {
-        self.nibbles == U256::ZERO
+        self.nibbles.is_zero()
     }
 
     /// Returns the total number of nibbles in this [`Nibbles`].
