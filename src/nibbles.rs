@@ -425,6 +425,7 @@ impl Nibbles {
 
     /// Converts a fixed 32 byte array into a [`Nibbles`] instance. Similar to [`unpack`], but
     /// is not `unsafe`.
+    #[inline]
     pub fn unpack_array(data: &[u8; 32]) -> Self {
         let nibbles = U256::from_be_bytes(*data);
         Self { length: 64, nibbles }
