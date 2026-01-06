@@ -662,11 +662,7 @@ impl Nibbles {
     /// Returns the nibble at the given index.
     #[inline]
     pub fn get(&self, i: usize) -> Option<u8> {
-        if self.check_index(i) {
-            Some(self.get_unchecked(i))
-        } else {
-            None
-        }
+        if self.check_index(i) { Some(self.get_unchecked(i)) } else { None }
     }
 
     /// Returns the nibble at the given index.
@@ -679,11 +675,7 @@ impl Nibbles {
     pub fn get_unchecked(&self, i: usize) -> u8 {
         self.assert_index(i);
         let byte = as_le_slice(&self.nibbles)[U256::BYTES - i / 2 - 1];
-        if i % 2 == 0 {
-            byte >> 4
-        } else {
-            byte & 0x0F
-        }
+        if i % 2 == 0 { byte >> 4 } else { byte & 0x0F }
     }
 
     /// Sets the nibble at the given index.
@@ -744,11 +736,7 @@ impl Nibbles {
     #[inline]
     pub fn last(&self) -> Option<u8> {
         let len = self.len();
-        if len == 0 {
-            None
-        } else {
-            Some(self.get_unchecked(len - 1))
-        }
+        if len == 0 { None } else { Some(self.get_unchecked(len - 1)) }
     }
 
     /// Returns the length of the common prefix between this nibble sequence and the given.
@@ -795,11 +783,7 @@ impl Nibbles {
             (self.nibbles ^ other.nibbles) & mask
         };
 
-        if xor == U256::ZERO {
-            min_nibble_len
-        } else {
-            xor.leading_zeros() / 4
-        }
+        if xor == U256::ZERO { min_nibble_len } else { xor.leading_zeros() / 4 }
     }
 
     /// Returns the total number of bits in this [`Nibbles`].
