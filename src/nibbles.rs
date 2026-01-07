@@ -842,10 +842,7 @@ impl Nibbles {
     /// ```
     #[inline]
     pub fn next_without_prefix(&self) -> Option<Self> {
-        let result = self.increment().unwrap_or_default();
-        if result.is_zeroes() {
-            return None;
-        }
+        let result = self.increment()?;
 
         // truncate to position of last non-zero Nibble
         let length = NIBBLES - (result.nibbles.trailing_zeros() / 4);
