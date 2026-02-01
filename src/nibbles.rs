@@ -86,7 +86,7 @@ static INCREMENT_VALUES: [U256; 65] = {
 /// assert_eq!(&packed[..], &bytes[..]);
 /// ```
 #[repr(C)] // We want to preserve the order of fields in the memory layout.
-#[derive(Default, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct Nibbles {
     /// Nibbles length.
     // This field goes first, because the derived implementation of `PartialEq` compares the fields
@@ -105,6 +105,28 @@ impl fmt::Debug for Nibbles {
         } else {
             let shifted = self.nibbles >> ((NIBBLES - self.len()) * 4);
             write!(f, "Nibbles(0x{:0width$x})", shifted, width = self.len())
+        }
+    }
+}
+
+impl core::hash::Hash for Nibbles {
+    #[inline]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        cfg_if! {
+            if #[cfg(target_pointer_width = "64")] {
+                // SAFETY: `#[repr(C)]` guarantees memory layout,
+                // and 64 bit usize means this struct is exactly 5 u64s.
+                const {
+                    assert!(size_of::<Self>() == size_of::<[u64; 5]>());
+                    assert!(align_of::<Self>() >= align_of::<[u64; 5]>());
+                }
+                unsafe {
+                    (*(self as *const Self as *const [u64; 5])).hash(state)
+                }
+            } else {
+                self.length.hash(state);
+                self.nibbles.hash(state);
+            }
         }
     }
 }
@@ -1202,6 +1224,7 @@ impl<'a, const N: usize> ByteContainer<'a, N> {
     /// ## Panics
     /// Panics if the current variant is `Borrowed` and the slice length is less than `N`.
     #[cfg_attr(target_endian = "little", allow(unused))]
+    #[inline]
     pub(crate) fn to_mut(&mut self) -> &mut [u8; N] {
         match self {
             ByteContainer::Borrowed(slice) => {
@@ -1218,6 +1241,7 @@ impl<'a, const N: usize> ByteContainer<'a, N> {
 impl<'a, const N: usize> Deref for ByteContainer<'a, N> {
     type Target = [u8];
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         match self {
             ByteContainer::Borrowed(slice) => slice,
