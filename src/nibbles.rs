@@ -1296,21 +1296,6 @@ fn first_diff_byte_idx(a: &U256, b: &U256) -> usize {
                     mask.leading_ones() as usize
                 };
             }
-        } else if #[cfg(target_arch = "aarch64")] {
-            #[cfg(feature = "std")]
-            let enabled = std::is_aarch64_feature_detected!("neon");
-            #[cfg(not(feature = "std"))]
-            let enabled = cfg!(target_feature = "neon");
-            if enabled {
-                use core::arch::aarch64::*;
-                return unsafe {
-                    let a = vld1q_u8(a.as_limbs().as_ptr().cast());
-                    let b = vld1q_u8(b.as_limbs().as_ptr().cast());
-                    let diff = veorq_u8(a, b);
-                    let mask = vgetq_lane_u64(vcnt_u8(diff), 0);
-                    mask.leading_ones() as usize
-                };
-            }
         }
     }
 
