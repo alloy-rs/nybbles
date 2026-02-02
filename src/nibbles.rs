@@ -653,7 +653,6 @@ impl Nibbles {
     }
 
     /// Returns `true` if this nibble sequence ends with the given suffix.
-    #[inline]
     pub fn ends_with(&self, other: &Self) -> bool {
         // If other is empty, it's a suffix of any sequence
         if other.is_empty() {
