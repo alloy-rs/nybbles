@@ -649,7 +649,7 @@ impl Nibbles {
     /// Returns `true` if this nibble sequence starts with the given prefix.
     #[inline]
     pub fn starts_with(&self, other: &Self) -> bool {
-        other.len() <= self.len() && self.common_prefix_length_raw(other) >= other.len()
+        other.len() <= self.len() && (self.nibbles & SLICE_MASKS[other.len()]) == other.nibbles
     }
 
     /// Returns `true` if this nibble sequence ends with the given suffix.
