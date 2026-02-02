@@ -1088,15 +1088,14 @@ impl Nibbles {
 
     #[inline]
     fn as_array(&self) -> Option<&AsArray> {
-        const {
-            assert!(size_of::<Self>() == size_of::<AsArray>());
-            assert!(align_of::<Self>() >= align_of::<AsArray>());
-        };
-
         cfg_if! {
             if #[cfg(target_pointer_width = "64")] {
                 // SAFETY: `#[repr(C)]` guarantees memory layout,
                 // and 64 bit usize means this struct is exactly 5 u64s.
+                const {
+                    assert!(size_of::<Self>() == size_of::<AsArray>());
+                    assert!(align_of::<Self>() >= align_of::<AsArray>());
+                }
                 Some(unsafe { &*(self as *const Self as *const AsArray) })
             } else {
                 None
