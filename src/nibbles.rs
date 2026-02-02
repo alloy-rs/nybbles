@@ -86,14 +86,12 @@ static INCREMENT_VALUES: [U256; 65] = {
 /// assert_eq!(&packed[..], &bytes[..]);
 /// ```
 #[repr(C)] // We want to preserve the order of fields in the memory layout.
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Clone, Copy, Eq)]
 pub struct Nibbles {
     /// Nibbles length.
-    // This field goes first, because the derived implementation of `PartialEq` compares the fields
-    // in order, so we can short-circuit the comparison if the `length` field differs.
     pub(crate) length: usize,
-    /// The nibbles themselves, stored as a 256-bit unsigned integer with most significant bits set
-    /// first.
+    /// The nibbles themselves,
+    /// stored as a 256-bit unsigned integer with most significant bits set first.
     pub(crate) nibbles: U256,
 }
 
@@ -109,24 +107,29 @@ impl fmt::Debug for Nibbles {
     }
 }
 
+type AsArray = [u64; 5];
+
+impl PartialEq for Nibbles {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        if let Some(arr) = self.as_array()
+            && let Some(other_arr) = other.as_array()
+        {
+            arr == other_arr
+        } else {
+            self.length == other.length && self.nibbles == other.nibbles
+        }
+    }
+}
+
 impl core::hash::Hash for Nibbles {
     #[inline]
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        cfg_if! {
-            if #[cfg(target_pointer_width = "64")] {
-                // SAFETY: `#[repr(C)]` guarantees memory layout,
-                // and 64 bit usize means this struct is exactly 5 u64s.
-                const {
-                    assert!(size_of::<Self>() == size_of::<[u64; 5]>());
-                    assert!(align_of::<Self>() >= align_of::<[u64; 5]>());
-                }
-                unsafe {
-                    (*(self as *const Self as *const [u64; 5])).hash(state)
-                }
-            } else {
-                self.length.hash(state);
-                self.nibbles.hash(state);
-            }
+        if let Some(arr) = self.as_array() {
+            arr.hash(state);
+        } else {
+            self.length.hash(state);
+            self.nibbles.hash(state);
         }
     }
 }
@@ -1080,6 +1083,23 @@ impl Nibbles {
         let len = self.len();
         if i >= len {
             panic_invalid_index(len, i);
+        }
+    }
+
+    #[inline]
+    const fn as_array(&self) -> Option<&AsArray> {
+        cfg_if! {
+            if #[cfg(target_pointer_width = "64")] {
+                // SAFETY: `#[repr(C)]` guarantees memory layout,
+                // and 64 bit usize means this struct is exactly 5 u64s.
+                const {
+                    assert!(size_of::<Self>() == size_of::<AsArray>());
+                    assert!(align_of::<Self>() >= align_of::<AsArray>());
+                }
+                Some(unsafe { &*(self as *const Self as *const AsArray) })
+            } else {
+                None
+            }
         }
     }
 }
