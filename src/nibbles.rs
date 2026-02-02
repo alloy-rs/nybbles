@@ -1087,7 +1087,7 @@ impl Nibbles {
     }
 
     #[inline]
-    fn as_array(&self) -> Option<&AsArray> {
+    const fn as_array(&self) -> Option<&AsArray> {
         cfg_if! {
             if #[cfg(target_pointer_width = "64")] {
                 // SAFETY: `#[repr(C)]` guarantees memory layout,
