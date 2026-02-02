@@ -779,6 +779,7 @@ impl Nibbles {
         self.common_prefix_length_raw(other).min(l)
     }
 
+    #[inline]
     fn common_prefix_length_raw(&self, other: &Self) -> usize {
         first_diff_bit_idx(&self.nibbles, &other.nibbles) / 4
     }
@@ -1291,8 +1292,8 @@ fn diff_bit_idx<const EXACT: bool>(a: &U256, b: &U256) -> usize {
                         return bytes * 8;
                     }
                     let le_idx = 31 - bytes;
-                    let a = a.as_le_slice()[le_idx];
-                    let b = b.as_le_slice()[le_idx];
+                    let a = *a.as_le_slice().get_unchecked(le_idx);
+                    let b = *b.as_le_slice().get_unchecked(le_idx);
                     let diff = a ^ b;
                     let bits = diff.leading_zeros() as usize;
                     bytes * 8 + bits
