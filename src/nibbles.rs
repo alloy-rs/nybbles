@@ -163,7 +163,7 @@ impl Ord for Nibbles {
         let l = cmp::min(self_len, other_len);
         let len_cmp = self.len().cmp(&other.len());
 
-        let byte_idx = first_diff_byte_idx(&self.nibbles, &other.nibbles);
+        let byte_idx = longest_prefix_byte(&self.nibbles, &other.nibbles);
         let r = if byte_idx < l {
             // SAFETY: `byte_idx` < 32, so `31 - byte_idx` is valid.
             let le_idx = 31 - byte_idx;
@@ -781,7 +781,7 @@ impl Nibbles {
 
     #[inline]
     fn common_prefix_length_raw(&self, other: &Self) -> usize {
-        first_diff_bit_idx(&self.nibbles, &other.nibbles) / 4
+        longest_prefix_bit(&self.nibbles, &other.nibbles) / 4
     }
 
     /// Returns the total number of bits in this [`Nibbles`].
@@ -1263,17 +1263,17 @@ const fn as_le_slice(x: &U256) -> ByteContainer<'_, { U256::BYTES }> {
 }
 
 #[inline]
-fn first_diff_byte_idx(a: &U256, b: &U256) -> usize {
-    diff_bit_idx::<false>(a, b) / 8
+fn longest_prefix_byte(a: &U256, b: &U256) -> usize {
+    longest_prefix::<false>(a, b) / 8
 }
 
 #[inline]
-fn first_diff_bit_idx(a: &U256, b: &U256) -> usize {
-    diff_bit_idx::<true>(a, b)
+fn longest_prefix_bit(a: &U256, b: &U256) -> usize {
+    longest_prefix::<true>(a, b)
 }
 
 #[inline]
-fn diff_bit_idx<const EXACT: bool>(a: &U256, b: &U256) -> usize {
+fn longest_prefix<const EXACT: bool>(a: &U256, b: &U256) -> usize {
     cfg_if! {
         if #[cfg(target_arch = "x86_64")] {
             #[cfg(feature = "std")]
