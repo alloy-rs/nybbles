@@ -121,7 +121,7 @@ pub fn bench_join(c: &mut Criterion) {
     let mut group = c.benchmark_group("join");
 
     for size in SIZE_NIBBLES {
-        let nibbles = Nibbles::from_nibbles(generate_nibbles(size));
+        let nibbles = Nibbles::from_nibbles(generate_nibbles(size / 2));
         let other_nibbles = Nibbles::from_nibbles(generate_nibbles(size / 2));
 
         group.bench_with_input(
