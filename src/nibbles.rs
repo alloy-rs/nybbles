@@ -933,14 +933,14 @@ impl Nibbles {
         self.slice_check(start, end);
         // Extra hint to remove the bounds check in `slice_unchecked`.
         // SAFETY: `start <= end <= self.len() <= 64`
-        unsafe { std::hint::assert_unchecked(end - start <= 64) };
+        unsafe { core::hint::assert_unchecked(end - start <= 64) };
 
         self.slice_unchecked(start, end)
     }
 
     #[inline]
     #[cfg_attr(debug_assertions, track_caller)]
-    fn slice_check(&self, start: usize, end: usize) {
+    const fn slice_check(&self, start: usize, end: usize) {
         if !(start <= end && end <= self.len()) {
             panic_invalid_slice(start, end, self.len());
         }
