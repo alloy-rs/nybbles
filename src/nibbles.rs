@@ -850,7 +850,7 @@ impl Nibbles {
     /// Returns the total number of bytes in this [`Nibbles`].
     #[inline]
     pub const fn byte_len(&self) -> usize {
-        (self.len() + 1) / 2
+        byte_len(self.len())
     }
 
     /// Returns a mutable reference to the underlying [`U256`].
@@ -1326,6 +1326,12 @@ fn first_diff_byte_idx(a: &U256, b: &U256) -> usize {
     }
 
     (*a ^ *b).leading_zeros() / 8
+}
+
+#[inline]
+#[allow(clippy::manual_div_ceil)] // Div_ceil has superfluous overflow check.
+const fn byte_len(nibble_len: usize) -> usize {
+    (nibble_len + 1) / 2
 }
 
 #[cfg(test)]
