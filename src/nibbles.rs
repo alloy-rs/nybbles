@@ -1275,28 +1275,40 @@ const fn as_le_slice(x: &U256) -> ByteContainer<'_, { U256::BYTES }> {
 #[inline]
 fn first_diff_byte_idx(a: &U256, b: &U256) -> usize {
     cfg_if! {
-        if #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))] {
-            use core::arch::x86_64::*;
-            unsafe {
-                let a = _mm256_loadu_si256(a.as_limbs().as_ptr().cast());
-                let b = _mm256_loadu_si256(b.as_limbs().as_ptr().cast());
-                let diff = _mm256_cmpeq_epi8(a, b);
-                let mask = _mm256_movemask_epi8(diff);
-                mask.leading_ones() as usize
+        if #[cfg(target_arch = "x86_64")] {
+            #[cfg(feature = "std")]
+            let enabled = std::is_x86_feature_detected!("avx2");
+            #[cfg(not(feature = "std"))]
+            let enabled = cfg!(target_feature = "avx2");
+            if enabled {
+                use core::arch::x86_64::*;
+                return unsafe {
+                    let a = _mm256_loadu_si256(a.as_limbs().as_ptr().cast());
+                    let b = _mm256_loadu_si256(b.as_limbs().as_ptr().cast());
+                    let diff = _mm256_cmpeq_epi8(a, b);
+                    let mask = _mm256_movemask_epi8(diff);
+                    mask.leading_ones() as usize
+                };
             }
-        } else if #[cfg(all(target_arch = "aarch64", target_feature = "neon"))] {
-            use core::arch::aarch64::*;
-            unsafe {
-                let a = vld1q_u8(a.as_limbs().as_ptr().cast());
-                let b = vld1q_u8(b.as_limbs().as_ptr().cast());
-                let diff = veorq_u8(a, b);
-                let mask = vgetq_lane_u64(vcnt_u8(diff), 0);
-                mask.leading_ones() as usize
+        } else if #[cfg(target_arch = "aarch64")] {
+            #[cfg(feature = "std")]
+            let enabled = std::is_aarch64_feature_detected!("neon");
+            #[cfg(not(feature = "std"))]
+            let enabled = cfg!(target_feature = "neon");
+            if enabled {
+                use core::arch::aarch64::*;
+                return unsafe {
+                    let a = vld1q_u8(a.as_limbs().as_ptr().cast());
+                    let b = vld1q_u8(b.as_limbs().as_ptr().cast());
+                    let diff = veorq_u8(a, b);
+                    let mask = vgetq_lane_u64(vcnt_u8(diff), 0);
+                    mask.leading_ones() as usize
+                };
             }
-        } else {
-            (*a ^ *b).leading_zeros() / 8
         }
     }
+
+    (*a ^ *b).leading_zeros() / 8
 }
 
 #[cfg(test)]
