@@ -158,14 +158,20 @@ impl Ord for Nibbles {
         let self_len = self.len().div_ceil(2);
         let other_len = other.len().div_ceil(2);
         let l = cmp::min(self_len, other_len);
+        let len_cmp = self.len().cmp(&other.len());
 
         let byte_idx = first_diff_byte_idx(&self.nibbles, &other.nibbles);
-        // SAFETY: `byte_idx` is always within the bounds of the slices.
-        let get = |x: &U256| unsafe { *as_le_slice(x).get_unchecked(byte_idx) };
-        let a = get(&self.nibbles);
-        let b = get(&other.nibbles);
-        core::hint::select_unpredictable(byte_idx < l, a.cmp(&b), Ordering::Equal)
-            .then(self.len().cmp(&other.len()))
+        let r = if byte_idx < l {
+            // SAFETY: `byte_idx` < 32, so `31 - byte_idx` is valid.
+            let le_idx = 31 - byte_idx;
+            let get = |x: &U256| unsafe { *as_le_slice(x).get_unchecked(le_idx) };
+            let a = get(&self.nibbles);
+            let b = get(&other.nibbles);
+            a.cmp(&b)
+        } else {
+            Ordering::Equal
+        };
+        core::hint::select_unpredictable(r == Ordering::Equal, len_cmp, r)
     }
 }
 
