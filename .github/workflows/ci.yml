@@ -25,7 +25,7 @@ jobs:
             i686-unknown-linux-gnu,
             x86_64-unknown-linux-gnu,
           ]
-        rust: [nightly, stable, "1.85"] # MSRV
+        rust: [nightly, stable, "1.88"] # MSRV
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -45,12 +45,12 @@ jobs:
 
       - run: cargo build
       - run: cargo test
-        if: matrix.rust != '1.81' # MSRV
+        if: matrix.rust != '1.88' # MSRV
       - run: cargo build --no-default-features
       - run: cargo test --no-default-features
-        if: matrix.rust != '1.81' # MSRV
+        if: matrix.rust != '1.88' # MSRV
       - run: cargo test
-        if: matrix.rust != '1.81' # MSRV
+        if: matrix.rust != '1.88' # MSRV
       - run: cargo test --all-features
         if: matrix.rust == 'nightly'
 
@@ -86,7 +86,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flags: ["--no-default-features", "", "--all-features", "--target mips64-unknown-linux-gnuabi64"]
+        flags:
+          - "--no-default-features"
+          - ""
+          - "--all-features"
+          - "--target mips64-unknown-linux-gnuabi64"
     env:
       MIRIFLAGS: -Zmiri-strict-provenance
     steps:
