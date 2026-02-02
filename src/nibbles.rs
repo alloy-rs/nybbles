@@ -158,8 +158,8 @@ impl PartialOrd for Nibbles {
 impl Ord for Nibbles {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
-        let self_len = self.len().div_ceil(2);
-        let other_len = other.len().div_ceil(2);
+        let self_len = self.byte_len();
+        let other_len = other.byte_len();
         let l = cmp::min(self_len, other_len);
         let len_cmp = self.len().cmp(&other.len());
 
@@ -482,7 +482,7 @@ impl Nibbles {
     /// ```
     #[inline]
     pub fn pack(&self) -> SmallVec<[u8; 32]> {
-        let packed_len = self.len().div_ceil(2);
+        let packed_len = self.byte_len();
         unsafe { smallvec_with(packed_len, |out| self.pack_to_slice_unchecked(out)) }
     }
 
@@ -506,7 +506,7 @@ impl Nibbles {
     #[inline]
     #[track_caller]
     pub fn pack_to(&self, out: &mut [u8]) {
-        assert!(out.len() >= self.len().div_ceil(2));
+        assert!(out.len() >= self.byte_len());
         // SAFETY: asserted length.
         unsafe { self.pack_to_unchecked(out.as_mut_ptr()) }
     }
@@ -532,7 +532,7 @@ impl Nibbles {
     #[inline]
     pub unsafe fn pack_to_unchecked(&self, ptr: *mut u8) {
         unsafe {
-            let slice = slice::from_raw_parts_mut(ptr.cast(), self.len().div_ceil(2));
+            let slice = slice::from_raw_parts_mut(ptr.cast(), self.byte_len());
             pack_to_unchecked(self, slice);
         }
     }
@@ -845,6 +845,12 @@ impl Nibbles {
         debug_assert!(len <= 64);
         unsafe { core::hint::assert_unchecked(len <= 64) };
         len
+    }
+
+    /// Returns the total number of bytes in this [`Nibbles`].
+    #[inline]
+    pub const fn byte_len(&self) -> usize {
+        byte_len(self.len())
     }
 
     /// Returns a mutable reference to the underlying [`U256`].
@@ -1170,7 +1176,7 @@ impl<'a> ExactSizeIterator for NibblesIter<'a> {
 /// `out` must be valid for at least `(self.len() + 1) / 2` bytes.
 #[inline]
 unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
-    let byte_len = nibbles.len().div_ceil(2);
+    let byte_len = nibbles.byte_len();
     debug_assert!(out.len() >= byte_len);
     // Move source pointer to the end of the little endian slice
     let sl = as_le_slice(&nibbles.nibbles);
@@ -1320,6 +1326,12 @@ fn first_diff_byte_idx(a: &U256, b: &U256) -> usize {
     }
 
     (*a ^ *b).leading_zeros() / 8
+}
+
+#[inline]
+#[allow(clippy::manual_div_ceil)] // Div_ceil has superfluous overflow check.
+const fn byte_len(nibble_len: usize) -> usize {
+    (nibble_len + 1) / 2
 }
 
 #[cfg(test)]
