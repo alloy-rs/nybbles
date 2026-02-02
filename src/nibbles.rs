@@ -145,6 +145,13 @@ impl<'a> arbitrary::Arbitrary<'a> for Nibbles {
     }
 }
 
+impl PartialOrd for Nibbles {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 // Deriving [`Ord`] for [`Nibbles`] is not correct, because they will be compared as unsigned
 // integers without accounting for length. This is incorrect, because `0x1` should be considered
 // greater than `0x02`.
@@ -154,36 +161,38 @@ impl Ord for Nibbles {
         let self_len = self.len().div_ceil(2);
         let other_len = other.len().div_ceil(2);
         let l = cmp::min(self_len, other_len);
+        let len_cmp = self.len().cmp(&other.len());
 
-        // Slice to the loop iteration range to enable bound check
-        // elimination in the compiler
-        let lhs = &as_le_slice(&self.nibbles)[U256::BYTES - l..];
-        let rhs = &as_le_slice(&other.nibbles)[U256::BYTES - l..];
-
-        for i in (0..l).rev() {
-            match lhs[i].cmp(&rhs[i]) {
-                Ordering::Equal => (),
-                non_eq => return non_eq,
-            }
-        }
-
-        self.len().cmp(&other.len())
-    }
-}
-
-impl PartialOrd for Nibbles {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+        let byte_idx = first_diff_byte_idx(&self.nibbles, &other.nibbles);
+        let r = if byte_idx < l {
+            // SAFETY: `byte_idx` < 32, so `31 - byte_idx` is valid.
+            let le_idx = 31 - byte_idx;
+            let get = |x: &U256| unsafe { *as_le_slice(x).get_unchecked(le_idx) };
+            let a = get(&self.nibbles);
+            let b = get(&other.nibbles);
+            a.cmp(&b)
+        } else {
+            Ordering::Equal
+        };
+        core::hint::select_unpredictable(r == Ordering::Equal, len_cmp, r)
     }
 }
 
 impl FromIterator<u8> for Nibbles {
+    #[inline]
     fn from_iter<T: IntoIterator<Item = u8>>(iter: T) -> Self {
         let mut nibbles = Self::default();
-        for n in iter {
-            nibbles.push(n);
-        }
+        Extend::extend(&mut nibbles, iter);
         nibbles
+    }
+}
+
+impl Extend<u8> for Nibbles {
+    #[inline]
+    fn extend<T: IntoIterator<Item = u8>>(&mut self, iter: T) {
+        for n in iter {
+            self.push(n);
+        }
     }
 }
 
@@ -967,14 +976,17 @@ impl Nibbles {
     /// nibble `0x2` is pushed.
     #[inline]
     pub const fn push_unchecked(&mut self, nibble: u8) {
+        let len = self.len();
+        self.length = len + 1;
+        let _ = self.len(); // Assert invariant.
+
         let nibble_val = (nibble & 0x0F) as u64;
         if nibble_val == 0 {
             // Nothing to do, limb nibbles are already set to zero by default
-            self.length += 1;
             return;
         }
 
-        let bit_pos = (NIBBLES - self.len() - 1) * 4;
+        let bit_pos = (NIBBLES - len - 1) * 4;
         let limb_idx = bit_pos / 64;
         let shift_in_limb = bit_pos % 64;
 
@@ -983,8 +995,6 @@ impl Nibbles {
             let limbs = self.nibbles.as_limbs_mut();
             limbs[limb_idx] |= nibble_val << shift_in_limb;
         }
-
-        self.length += 1;
     }
 
     /// Pops a nibble from the end of the current nibbles.
@@ -1018,6 +1028,7 @@ impl Nibbles {
 
     /// Extend the current nibbles with another nibbles.
     pub fn extend(&mut self, other: &Nibbles) {
+        self.extend_check(other.len());
         if other.is_empty() {
             return;
         }
@@ -1028,11 +1039,16 @@ impl Nibbles {
 
     /// Extend the current nibbles with another byte slice.
     pub fn extend_from_slice(&mut self, other: &[u8]) {
+        self.extend_check(other.len() * 2);
+        self.extend_from_slice_unchecked(other);
+    }
+
+    #[inline]
+    fn extend_check(&self, other_len: usize) {
         assert!(
-            self.length + other.len() * 2 <= NIBBLES,
+            self.len() + other_len <= NIBBLES,
             "Cannot extend: resulting length would exceed maximum capacity"
         );
-        self.extend_from_slice_unchecked(other);
     }
 
     /// Extend the current nibbles with another byte slice.
@@ -1280,6 +1296,30 @@ const fn as_le_slice(x: &U256) -> ByteContainer<'_, { U256::BYTES }> {
             ByteContainer::Owned(x.to_le_bytes())
         }
     }
+}
+
+#[inline]
+fn first_diff_byte_idx(a: &U256, b: &U256) -> usize {
+    cfg_if! {
+        if #[cfg(target_arch = "x86_64")] {
+            #[cfg(feature = "std")]
+            let enabled = std::is_x86_feature_detected!("avx2");
+            #[cfg(not(feature = "std"))]
+            let enabled = cfg!(target_feature = "avx2");
+            if enabled {
+                use core::arch::x86_64::*;
+                return unsafe {
+                    let a = _mm256_loadu_si256(a.as_limbs().as_ptr().cast());
+                    let b = _mm256_loadu_si256(b.as_limbs().as_ptr().cast());
+                    let diff = _mm256_cmpeq_epi8(a, b);
+                    let mask = _mm256_movemask_epi8(diff);
+                    mask.leading_ones() as usize
+                };
+            }
+        }
+    }
+
+    (*a ^ *b).leading_zeros() / 8
 }
 
 #[cfg(test)]
