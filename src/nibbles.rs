@@ -898,36 +898,19 @@ impl Nibbles {
     /// The caller must ensure that `start <= end` and `end <= self.len()`.
     #[inline]
     pub fn slice_unchecked(&self, start: usize, end: usize) -> Self {
-        // Fast path for empty slice
-        if end == 0 || end <= start {
+        #[cfg(debug_assertions)]
+        self.slice_check(start, end);
+        let length = end - start;
+        if length == 0 {
             return Self::new();
         }
-
-        // Fast path for full slice
-        let slice_to_end = end == self.len();
-        if start == 0 && slice_to_end {
-            return *self;
+        let mask = SLICE_MASKS[length];
+        let mut nibbles = self.nibbles;
+        if start != 0 {
+            nibbles <<= start * 4;
         }
-
-        let nibble_len = end - start;
-
-        // Optimize for common case where start == 0
-        let nibbles = if start == 0 {
-            // When slicing from the beginning, we can just apply the mask and avoid XORing
-            self.nibbles & SLICE_MASKS[end]
-        } else {
-            // For middle and to_end cases, always shift first
-            let shifted = self.nibbles << (start * 4);
-            if slice_to_end {
-                // When slicing to the end, no mask needed after shift
-                shifted
-            } else {
-                // For middle slices, apply end mask after shift
-                shifted & SLICE_MASKS[end - start]
-            }
-        };
-
-        Self { length: nibble_len, nibbles }
+        nibbles &= mask;
+        Self { length, nibbles }
     }
 
     /// Creates new nibbles containing the nibbles in the specified range.
@@ -947,13 +930,20 @@ impl Nibbles {
             Bound::Excluded(&idx) => idx,
             Bound::Unbounded => self.len(),
         };
-        assert!(start <= end, "Cannot slice with a start index greater than the end index");
-        assert!(
-            end <= self.len(),
-            "Cannot slice with an end index greater than the length of the nibbles"
-        );
+        self.slice_check(start, end);
+        // Extra hint to remove the bounds check in `slice_unchecked`.
+        // SAFETY: `start <= end <= self.len() <= 64`
+        unsafe { std::hint::assert_unchecked(end - start <= 64) };
 
         self.slice_unchecked(start, end)
+    }
+
+    #[inline]
+    #[cfg_attr(debug_assertions, track_caller)]
+    fn slice_check(&self, start: usize, end: usize) {
+        if !(start <= end && end <= self.len()) {
+            panic_invalid_slice(start, end, self.len());
+        }
     }
 
     /// Join two nibble sequences together.
@@ -1050,6 +1040,7 @@ impl Nibbles {
     }
 
     #[inline]
+    #[cfg_attr(debug_assertions, track_caller)]
     fn extend_check(&self, other_len: usize) {
         assert!(
             self.len() + other_len <= NIBBLES,
@@ -1247,6 +1238,15 @@ const fn panic_invalid_nibbles() -> ! {
 #[cfg_attr(debug_assertions, track_caller)]
 fn panic_invalid_index(len: usize, i: usize) -> ! {
     panic!("index out of bounds: {i} for nibbles of length {len}");
+}
+
+#[cold]
+#[inline(never)]
+#[cfg_attr(debug_assertions, track_caller)]
+const fn panic_invalid_slice(start: usize, end: usize, len: usize) -> ! {
+    assert!(start <= end, "Cannot slice with a start index greater than the end index");
+    assert!(end <= len, "Cannot slice with an end index greater than the length of the nibbles");
+    unreachable!()
 }
 
 /// Internal container for owned/borrowed byte slices.
