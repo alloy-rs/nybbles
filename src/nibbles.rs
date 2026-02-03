@@ -1282,33 +1282,33 @@ fn longest_prefix_bit(a: &U256, b: &U256) -> usize {
 
 #[inline]
 fn longest_prefix<const EXACT: bool>(a: &U256, b: &U256) -> usize {
-    // cfg_if! {
-    //     if #[cfg(target_arch = "x86_64")] {
-    //         #[cfg(feature = "std")]
-    //         let enabled = std::is_x86_feature_detected!("avx2");
-    //         #[cfg(not(feature = "std"))]
-    //         let enabled = cfg!(target_feature = "avx2");
-    //         if enabled {
-    //             return unsafe {
-    //                 use core::arch::x86_64::*;
-    //                 let x = _mm256_loadu_si256(a.as_limbs().as_ptr().cast());
-    //                 let y = _mm256_loadu_si256(b.as_limbs().as_ptr().cast());
-    //                 let diff = _mm256_cmpeq_epi8(x, y);
-    //                 let mask = _mm256_movemask_epi8(diff);
-    //                 let bytes = mask.leading_ones() as usize;
-    //                 if !EXACT || bytes == 32 {
-    //                     return bytes * 8;
-    //                 }
-    //                 let le_idx = 31 - bytes;
-    //                 let a = *a.as_le_slice().get_unchecked(le_idx);
-    //                 let b = *b.as_le_slice().get_unchecked(le_idx);
-    //                 let diff = a ^ b;
-    //                 let bits = diff.leading_zeros() as usize;
-    //                 bytes * 8 + bits
-    //             };
-    //         }
-    //     }
-    // }
+    cfg_if! {
+        if #[cfg(target_arch = "x86_64")] {
+            #[cfg(feature = "std")]
+            let enabled = std::is_x86_feature_detected!("avx2");
+            #[cfg(not(feature = "std"))]
+            let enabled = cfg!(target_feature = "avx2");
+            if enabled {
+                return unsafe {
+                    use core::arch::x86_64::*;
+                    let x = _mm256_loadu_si256(a.as_limbs().as_ptr().cast());
+                    let y = _mm256_loadu_si256(b.as_limbs().as_ptr().cast());
+                    let diff = _mm256_cmpeq_epi8(x, y);
+                    let mask = _mm256_movemask_epi8(diff);
+                    let bytes = mask.leading_ones() as usize;
+                    if !EXACT || bytes == 32 {
+                        return bytes * 8;
+                    }
+                    let le_idx = 31 - bytes;
+                    let a = *a.as_le_slice().get_unchecked(le_idx);
+                    let b = *b.as_le_slice().get_unchecked(le_idx);
+                    let diff = a ^ b;
+                    let bits = diff.leading_zeros() as usize;
+                    bytes * 8 + bits
+                };
+            }
+        }
+    }
 
     let diff = *a ^ *b;
     diff.leading_zeros()
