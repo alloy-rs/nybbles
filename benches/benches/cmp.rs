@@ -18,7 +18,7 @@ pub fn group(criterion: &mut Criterion) {
                 let other = n.slice(..n.len().saturating_sub(1));
                 (n, other)
             }),
-            |(a, b)| a.common_prefix_length(black_box(&b)),
+            |(a, b)| a.common_prefix_length(&b),
         );
     }
 }

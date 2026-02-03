@@ -163,7 +163,7 @@ impl Ord for Nibbles {
         let l = cmp::min(self_len, other_len);
         let len_cmp = self.len().cmp(&other.len());
 
-        let byte_idx = first_diff_byte_idx(&self.nibbles, &other.nibbles);
+        let byte_idx = longest_prefix_byte(&self.nibbles, &other.nibbles);
         let r = if byte_idx < l {
             // SAFETY: `byte_idx` < 32, so `31 - byte_idx` is valid.
             let le_idx = 31 - byte_idx;
@@ -647,20 +647,9 @@ impl Nibbles {
     }
 
     /// Returns `true` if this nibble sequence starts with the given prefix.
+    #[inline]
     pub fn starts_with(&self, other: &Self) -> bool {
-        // Fast path: if lengths don't allow prefix, return false
-        if other.len() > self.len() {
-            return false;
-        }
-
-        // Fast path: empty prefix always matches
-        if other.is_empty() {
-            return true;
-        }
-
-        // Direct comparison using masks
-        let mask = SLICE_MASKS[other.len()];
-        (self.nibbles & mask) == other.nibbles
+        other.len() <= self.len() && (self.nibbles & SLICE_MASKS[other.len()]) == other.nibbles
     }
 
     /// Returns `true` if this nibble sequence ends with the given suffix.
@@ -783,41 +772,15 @@ impl Nibbles {
     /// let b = Nibbles::from_nibbles(&[0x0A, 0x0B, 0x0C, 0x0E]);
     /// assert_eq!(a.common_prefix_length(&b), 3);
     /// ```
+    #[inline]
     pub fn common_prefix_length(&self, other: &Self) -> usize {
-        // Handle empty cases
-        if self.is_empty() || other.is_empty() {
-            return 0;
-        }
+        let l = self.len().min(other.len());
+        self.common_prefix_length_raw(other).min(l)
+    }
 
-        let min_nibble_len = self.len().min(other.len());
-
-        // Fast path for small sequences that fit in one u64 limb
-        if min_nibble_len <= 16 {
-            // Extract the highest u64 limb which contains all the nibbles
-            let self_limb = self.nibbles.as_limbs()[3];
-            let other_limb = other.nibbles.as_limbs()[3];
-
-            // Create mask for the nibbles we care about
-            let mask = u64::MAX << ((16 - min_nibble_len) * 4);
-            let xor = (self_limb ^ other_limb) & mask;
-
-            if xor == 0 {
-                return min_nibble_len;
-            } else {
-                return xor.leading_zeros() as usize / 4;
-            }
-        }
-
-        let xor = if min_nibble_len == NIBBLES && self.len() == other.len() {
-            // No need to mask for 64 nibble sequences, just XOR
-            self.nibbles ^ other.nibbles
-        } else {
-            // For other lengths, mask the nibbles we care about, and then XOR
-            let mask = SLICE_MASKS[min_nibble_len];
-            (self.nibbles ^ other.nibbles) & mask
-        };
-
-        if xor == U256::ZERO { min_nibble_len } else { xor.leading_zeros() / 4 }
+    #[inline]
+    fn common_prefix_length_raw(&self, other: &Self) -> usize {
+        longest_prefix_bit(&self.nibbles, &other.nibbles) / 4
     }
 
     /// Returns the total number of bits in this [`Nibbles`].
@@ -1308,7 +1271,17 @@ const fn as_le_slice(x: &U256) -> ByteContainer<'_, { U256::BYTES }> {
 }
 
 #[inline]
-fn first_diff_byte_idx(a: &U256, b: &U256) -> usize {
+fn longest_prefix_byte(a: &U256, b: &U256) -> usize {
+    longest_prefix::<false>(a, b) / 8
+}
+
+#[inline]
+fn longest_prefix_bit(a: &U256, b: &U256) -> usize {
+    longest_prefix::<true>(a, b)
+}
+
+#[inline]
+fn longest_prefix<const EXACT: bool>(a: &U256, b: &U256) -> usize {
     cfg_if! {
         if #[cfg(target_arch = "x86_64")] {
             #[cfg(feature = "std")]
@@ -1316,19 +1289,29 @@ fn first_diff_byte_idx(a: &U256, b: &U256) -> usize {
             #[cfg(not(feature = "std"))]
             let enabled = cfg!(target_feature = "avx2");
             if enabled {
-                use core::arch::x86_64::*;
                 return unsafe {
-                    let a = _mm256_loadu_si256(a.as_limbs().as_ptr().cast());
-                    let b = _mm256_loadu_si256(b.as_limbs().as_ptr().cast());
-                    let diff = _mm256_cmpeq_epi8(a, b);
+                    use core::arch::x86_64::*;
+                    let x = _mm256_loadu_si256(a.as_limbs().as_ptr().cast());
+                    let y = _mm256_loadu_si256(b.as_limbs().as_ptr().cast());
+                    let diff = _mm256_cmpeq_epi8(x, y);
                     let mask = _mm256_movemask_epi8(diff);
-                    mask.leading_ones() as usize
+                    let bytes = mask.leading_ones() as usize;
+                    if !EXACT || bytes == 32 {
+                        return bytes * 8;
+                    }
+                    let le_idx = 31 - bytes;
+                    let a = *a.as_le_slice().get_unchecked(le_idx);
+                    let b = *b.as_le_slice().get_unchecked(le_idx);
+                    let diff = a ^ b;
+                    let bits = diff.leading_zeros() as usize;
+                    bytes * 8 + bits
                 };
             }
         }
     }
 
-    (*a ^ *b).leading_zeros() / 8
+    let diff = *a ^ *b;
+    diff.leading_zeros()
 }
 
 #[inline]
