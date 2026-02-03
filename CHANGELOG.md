@@ -5,11 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.8](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.8) - 2026-02-03
+
+### Bug Fixes
+
+- Remove avx2 runtime detection ([#53](https://github.com/alloy-rs/nybbles/issues/53))
+
+### Dependencies
+
+- Bump MSRV to 1.88 ([#48](https://github.com/alloy-rs/nybbles/issues/48))
+- Bump codspeed
+
+### Features
+
+- Add byte_len ([#50](https://github.com/alloy-rs/nybbles/issues/50))
+
+### Miscellaneous Tasks
+
+- [meta] Add CODEOWNERS
+
+### Other
+
+- Update to tempoxyz ([#44](https://github.com/alloy-rs/nybbles/issues/44))
+
+### Performance
+
+- SIMD common prefix ([#49](https://github.com/alloy-rs/nybbles/issues/49))
+- Clean up slice fn ([#51](https://github.com/alloy-rs/nybbles/issues/51))
+- Cmp SIMD ([#46](https://github.com/alloy-rs/nybbles/issues/46))
+- Eq as [u64; 5] ([#47](https://github.com/alloy-rs/nybbles/issues/47))
+- Hash as [u64; 5] ([#45](https://github.com/alloy-rs/nybbles/issues/45))
+
+### Refactor
+
+- Restructure benches to be like ruint ([#52](https://github.com/alloy-rs/nybbles/issues/52))
+
 ## [0.4.7](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.7) - 2026-01-07
 
 ### Features
 
 - Add new methods ([#43](https://github.com/alloy-rs/nybbles/issues/43))
+
+### Miscellaneous Tasks
+
+- Release 0.4.7
 
 ## [0.4.6](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.6) - 2025-09-29
 
