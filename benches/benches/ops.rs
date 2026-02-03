@@ -24,7 +24,7 @@ pub fn group(criterion: &mut Criterion) {
         });
     }
 
-    for &size in &SIZE_NIBBLES {
+    for &size in &SIZE_NIBBLES[..SIZE_NIBBLES.len() - 1] {
         bench_binop(criterion, "join", size, |a, b| black_box(&a).join(black_box(&b)));
     }
 

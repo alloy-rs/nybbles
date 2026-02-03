@@ -67,8 +67,19 @@ fn mk_setup<'a, T: Strategy>(
 fn manual_batch<T, U>(
     mut setup: impl FnMut() -> T,
     mut f: impl FnMut(T) -> U,
-    _name: &str,
+    name: &str,
 ) -> impl FnMut(T) {
+    assert!(
+        !needs_drop::<T>(),
+        "{name:?}: cannot batch inputs that need to be dropped: {}",
+        std::any::type_name::<T>(),
+    );
+    assert!(
+        !needs_drop::<U>(),
+        "{name:?}: cannot batch outputs that need to be dropped: {}",
+        std::any::type_name::<U>(),
+    );
+
     let batch_size = black_box(10000);
     let inputs = black_box((0..batch_size).map(|_| setup()).collect::<Box<[_]>>());
     let mut out = black_box(Box::new_uninit_slice(batch_size));
@@ -78,6 +89,17 @@ fn manual_batch<T, U>(
             let output = unsafe { out.get_unchecked_mut(i) };
             output.write(f(input));
         }
+    }
+}
+
+#[cfg(codspeed)]
+fn needs_drop<T>() -> bool {
+    // SAFETY: `ArrayVec` doesn't implement `Copy` when `T: Copy` even though it
+    // can.
+    if std::any::type_name::<T>().contains("ArrayVec<u64") {
+        false
+    } else {
+        std::mem::needs_drop::<T>()
     }
 }
 
