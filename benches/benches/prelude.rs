@@ -9,6 +9,7 @@ pub use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
+pub use smallvec::SmallVec;
 pub use std::hint::black_box;
 
 pub const SIZE_NIBBLES: [usize; 4] = [8, 16, 32, 64];
@@ -94,9 +95,10 @@ fn manual_batch<T, U>(
 
 #[cfg(codspeed)]
 fn needs_drop<T>() -> bool {
-    // SAFETY: `ArrayVec` doesn't implement `Copy` when `T: Copy` even though it
-    // can.
-    if std::any::type_name::<T>().contains("ArrayVec<u64") {
+    let name = std::any::type_name::<T>();
+    // SAFETY: These types don't implement `Copy` when `T: Copy` even though
+    // they can.
+    if name.contains("SmallVec<") || name.contains("Nibbles") {
         false
     } else {
         std::mem::needs_drop::<T>()
@@ -116,6 +118,6 @@ pub fn nibbles_strategy(len: usize) -> impl Strategy<Value = Nibbles> {
     arb_vec(0u8..16, len).prop_map(|v| Nibbles::from_nibbles(v))
 }
 
-pub fn bytes_strategy(len: usize) -> impl Strategy<Value = Vec<u8>> {
-    arb_vec(proptest::arbitrary::any::<u8>(), len)
-}
+// pub fn bytes_strategy(len: usize) -> impl Strategy<Value = Vec<u8>> {
+//     arb_vec(proptest::arbitrary::any::<u8>(), len)
+// }

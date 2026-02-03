@@ -1,20 +1,21 @@
 use crate::prelude::*;
 
 pub fn group(criterion: &mut Criterion) {
-    for &size in &SIZE_NIBBLES {
-        bench_arbitrary_with(
-            criterion,
-            &format!("push/{size}"),
-            arb_vec(0u8..16, size),
-            |nibbles| {
-                let mut nib = Nibbles::new();
-                for nibble in nibbles {
-                    nib.push(black_box(nibble));
-                }
-                nib
-            },
-        );
-    }
+    // TODO: Vec<u8> needs drop, can't batch with codspeed.
+    // for &size in &SIZE_NIBBLES {
+    //     bench_arbitrary_with(
+    //         criterion,
+    //         &format!("push/{size}"),
+    //         arb_vec(0u8..16, size),
+    //         |nibbles| {
+    //             let mut nib = Nibbles::new();
+    //             for nibble in nibbles {
+    //                 nib.push(black_box(nibble));
+    //             }
+    //             nib
+    //         },
+    //     );
+    // }
 
     for &size in &SIZE_NIBBLES {
         bench_unop(criterion, "pop", size, |nib| {
