@@ -89,7 +89,7 @@ static INCREMENT_VALUES: [U256; 65] = {
 #[derive(Default, Clone, Copy, Eq)]
 pub struct Nibbles {
     /// Nibbles length.
-    pub(crate) length: usize,
+    pub(crate) len: usize,
     /// The nibbles themselves,
     /// stored as a 256-bit unsigned integer with most significant bits set first.
     pub(crate) nibbles: U256,
@@ -117,7 +117,7 @@ impl PartialEq for Nibbles {
         {
             arr == other_arr
         } else {
-            self.length == other.length && self.nibbles == other.nibbles
+            self.len == other.len && self.nibbles == other.nibbles
         }
     }
 }
@@ -128,7 +128,7 @@ impl core::hash::Hash for Nibbles {
         if let Some(arr) = self.as_array() {
             arr.hash(state);
         } else {
-            self.length.hash(state);
+            self.len.hash(state);
             self.nibbles.hash(state);
         }
     }
@@ -295,7 +295,7 @@ impl Nibbles {
     /// ```
     #[inline]
     pub const fn new() -> Self {
-        Self { length: 0, nibbles: U256::ZERO }
+        Self { len: 0, nibbles: U256::ZERO }
     }
 
     /// Creates a new [`Nibbles`] instance from the given iterator over nibbles, without checking
@@ -422,8 +422,8 @@ impl Nibbles {
     /// assert_eq!(nibbles.to_vec(), vec![0x0A, 0x0B, 0x0C, 0x0D]);
     /// ```
     pub unsafe fn unpack_unchecked(data: &[u8]) -> Self {
-        let length = data.len() * 2;
-        debug_assert!(length <= NIBBLES);
+        let len = data.len() * 2;
+        debug_assert!(len <= NIBBLES);
 
         cfg_if! {
             if #[cfg(target_endian = "little")] {
@@ -454,7 +454,7 @@ impl Nibbles {
             }
         }
 
-        Self { length, nibbles }
+        Self { len, nibbles }
     }
 
     /// Converts a fixed 32 byte array into a [`Nibbles`] instance. Similar to [`Nibbles::unpack`],
@@ -462,7 +462,7 @@ impl Nibbles {
     #[inline]
     pub const fn unpack_array(data: &[u8; 32]) -> Self {
         let nibbles = U256::from_be_bytes(*data);
-        Self { length: 64, nibbles }
+        Self { len: NIBBLES, nibbles }
     }
 
     /// Packs the nibbles into the given slice.
@@ -841,9 +841,9 @@ impl Nibbles {
     /// Returns the total number of nibbles in this [`Nibbles`].
     #[inline]
     pub const fn len(&self) -> usize {
-        let len = self.length;
-        debug_assert!(len <= 64);
-        unsafe { core::hint::assert_unchecked(len <= 64) };
+        let len = self.len;
+        debug_assert!(len <= NIBBLES);
+        unsafe { core::hint::assert_unchecked(len <= NIBBLES) };
         len
     }
 
@@ -885,8 +885,8 @@ impl Nibbles {
         let result = self.increment()?;
 
         // truncate to position of last non-zero Nibble
-        let length = NIBBLES - (result.nibbles.trailing_zeros() / 4);
-        Some(Self { length, nibbles: result.nibbles })
+        let len = NIBBLES - (result.nibbles.trailing_zeros() / 4);
+        Some(Self { len, nibbles: result.nibbles })
     }
 
     /// Creates new nibbles containing the nibbles in the specified range `[start, end)`
@@ -900,17 +900,20 @@ impl Nibbles {
     pub fn slice_unchecked(&self, start: usize, end: usize) -> Self {
         #[cfg(debug_assertions)]
         self.slice_check(start, end);
-        let length = end - start;
-        if length == 0 {
+        let len = end - start;
+        if len == 0 {
             return Self::new();
         }
-        let mask = SLICE_MASKS[length];
+        if len == self.len() {
+            return *self;
+        }
+        let mask = SLICE_MASKS[len];
         let mut nibbles = self.nibbles;
         if start != 0 {
             nibbles <<= start * 4;
         }
         nibbles &= mask;
-        Self { length, nibbles }
+        Self { len, nibbles }
     }
 
     /// Creates new nibbles containing the nibbles in the specified range.
@@ -932,8 +935,8 @@ impl Nibbles {
         };
         self.slice_check(start, end);
         // Extra hint to remove the bounds check in `slice_unchecked`.
-        // SAFETY: `start <= end <= self.len() <= 64`
-        unsafe { core::hint::assert_unchecked(end - start <= 64) };
+        // SAFETY: `start <= end <= self.len() <= NIBBLES`
+        unsafe { core::hint::assert_unchecked(end - start <= NIBBLES) };
 
         self.slice_unchecked(start, end)
     }
@@ -973,7 +976,7 @@ impl Nibbles {
     #[inline]
     pub const fn push_unchecked(&mut self, nibble: u8) {
         let len = self.len();
-        self.length = len + 1;
+        self.len = len + 1;
         let _ = self.len(); // Assert invariant.
 
         let nibble_val = (nibble & 0x0F) as u64;
@@ -1018,7 +1021,7 @@ impl Nibbles {
             }
         }
 
-        self.length -= 1;
+        self.len -= 1;
         Some(nibble)
     }
 
@@ -1030,7 +1033,7 @@ impl Nibbles {
         }
 
         self.nibbles |= other.nibbles >> self.bit_len();
-        self.length += other.length;
+        self.len += other.len;
     }
 
     /// Extend the current nibbles with another byte slice.
@@ -1065,7 +1068,7 @@ impl Nibbles {
             other <<= (U256::BYTES - len_bytes) * 8;
         }
         self.nibbles |= other >> self.bit_len();
-        self.length += len_bytes * 2;
+        self.len += len_bytes * 2;
     }
 
     /// Truncates the current nibbles to the given length.
