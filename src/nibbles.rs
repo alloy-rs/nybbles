@@ -112,13 +112,17 @@ type AsArray = [u64; 5];
 impl PartialEq for Nibbles {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        if let Some(arr) = self.as_array()
-            && let Some(other_arr) = other.as_array()
-        {
-            arr == other_arr
-        } else {
-            self.len == other.len && self.nibbles == other.nibbles
+        if self.len != other.len {
+            return false;
         }
+        let a = self.nibbles.as_limbs();
+        let b = other.nibbles.as_limbs();
+        // Compare most-significant limbs first for early exit and to skip zero limbs
+        // for small values (nibbles are stored MSB-first, so small `len` only uses top limbs).
+        a[3] == b[3]
+            && (self.len <= 16 || a[2] == b[2])
+            && (self.len <= 32 || a[1] == b[1])
+            && (self.len <= 48 || a[0] == b[0])
     }
 }
 
