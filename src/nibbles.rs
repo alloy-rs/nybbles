@@ -425,34 +425,9 @@ impl Nibbles {
         let len = data.len() * 2;
         debug_assert!(len <= NIBBLES);
 
-        cfg_if! {
-            if #[cfg(target_endian = "little")] {
-                let mut nibbles = U256::ZERO;
-                let nibbles_slice = unsafe { nibbles.as_le_slice_mut() };
-            } else {
-                let mut nibbles_slice = [0u8; 32];
-            }
-        }
-
-        // Source pointer is at the beginning
-        let mut src = data.as_ptr().cast::<u8>();
-        // Move destination pointer to the end of the little endian slice
-        let mut dst = unsafe { nibbles_slice.as_mut_ptr().add(U256::BYTES) };
-        // On each iteration, decrement the destination pointer by one, set the destination
-        // byte, and increment the source pointer by one
-        for _ in 0..data.len() {
-            unsafe {
-                dst = dst.sub(1);
-                *dst = *src;
-                src = src.add(1);
-            }
-        }
-
-        cfg_if! {
-            if #[cfg(target_endian = "big")] {
-                let nibbles = U256::from_le_bytes(nibbles_slice);
-            }
-        }
+        let mut be = [0u8; U256::BYTES];
+        unsafe { be.as_mut_ptr().copy_from_nonoverlapping(data.as_ptr(), data.len()) };
+        let nibbles = U256::from_be_bytes(be);
 
         Self { len, nibbles }
     }
@@ -1135,20 +1110,8 @@ impl<'a> ExactSizeIterator for NibblesIter<'a> {
 unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
     let byte_len = nibbles.byte_len();
     debug_assert!(out.len() >= byte_len);
-    // Move source pointer to the end of the little endian slice
-    let sl = as_le_slice(&nibbles.nibbles);
-    let mut src = unsafe { sl.as_ptr().add(U256::BYTES) };
-    // Destination pointer is at the beginning of the output slice
-    let mut dst = out.as_mut_ptr().cast::<u8>();
-    // On each iteration, decrement the source pointer by one, set the destination byte, and
-    // increment the destination pointer by one
-    for _ in 0..byte_len {
-        unsafe {
-            src = src.sub(1);
-            *dst = *src;
-            dst = dst.add(1);
-        }
-    }
+    let be = nibbles.nibbles.to_be_bytes::<{ U256::BYTES }>();
+    unsafe { out.as_mut_ptr().cast::<u8>().copy_from_nonoverlapping(be.as_ptr(), byte_len) };
 }
 
 /// Initializes a smallvec with the given length and a closure that initializes the buffer.
