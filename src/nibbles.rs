@@ -424,12 +424,7 @@ impl Nibbles {
     pub unsafe fn unpack_unchecked(data: &[u8]) -> Self {
         let len = data.len() * 2;
         debug_assert!(len <= NIBBLES);
-
-        let mut be = [0u8; U256::BYTES];
-        unsafe { be.as_mut_ptr().copy_from_nonoverlapping(data.as_ptr(), data.len()) };
-        let nibbles = U256::from_be_bytes(be);
-
-        Self { len, nibbles }
+        Self { len, nibbles: U256::from_be_slice(data) }
     }
 
     /// Converts a fixed 32 byte array into a [`Nibbles`] instance. Similar to [`Nibbles::unpack`],
