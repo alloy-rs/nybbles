@@ -939,8 +939,10 @@ impl Nibbles {
     #[inline]
     pub const fn push_unchecked(&mut self, nibble: u8) {
         let len = self.len();
+        if len >= NIBBLES {
+            return;
+        }
         self.len = len + 1;
-        let _ = self.len(); // Assert invariant.
 
         let nibble_val = (nibble & 0x0F) as u64;
         if nibble_val == 0 {
