@@ -27,7 +27,12 @@ jobs:
           ]
         rust: [nightly, stable, "1.88"] # MSRV
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     steps:
+      - name: Secure runner
+        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -62,7 +67,12 @@ jobs:
       fail-fast: false
       matrix:
         target: [mips-unknown-linux-gnu, mips64-unknown-linux-gnuabi64]
+    permissions:
+      contents: read
+      id-token: write
     steps:
+      - name: Secure runner
+        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - uses: taiki-e/setup-cross-toolchain-action@v1
@@ -93,7 +103,12 @@ jobs:
           - "--target mips64-unknown-linux-gnuabi64"
     env:
       MIRIFLAGS: -Zmiri-strict-provenance
+    permissions:
+      contents: read
+      id-token: write
     steps:
+      - name: Secure runner
+        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@miri
       - uses: Swatinem/rust-cache@v2
@@ -103,10 +118,20 @@ jobs:
     name: feature checks
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     steps:
+      - name: Secure runner
+        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
-      - uses: taiki-e/install-action@cargo-hack
+      - name: Install cargo-hack
+        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@25cce154e7fb10f99361a166468a6c56b9c31aa3
+        with:
+          tool: cargo-hack@0.6.45
+          checksum: true
+          fallback: none
       - uses: Swatinem/rust-cache@v2
       - name: cargo hack
         run: cargo hack check --feature-powerset --depth 2 --all-targets
@@ -114,7 +139,12 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     steps:
+      - name: Secure runner
+        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@clippy
       - uses: Swatinem/rust-cache@v2
@@ -128,7 +158,12 @@ jobs:
     name: docs
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     steps:
+      - name: Secure runner
+        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
@@ -142,7 +177,12 @@ jobs:
     name: fmt
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     steps:
+      - name: Secure runner
+        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
@@ -150,4 +190,26 @@ jobs:
       - run: cargo fmt --all --check
 
   deny:
-    uses: tempoxyz/ci/.github/workflows/deny.yml@main
+    name: cargo deny check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Secure runner
+        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        with:
+          toolchain: nightly
+      # Run on the protected host so dependency downloads are inspected.
+      - name: Install cargo-deny
+        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@25cce154e7fb10f99361a166468a6c56b9c31aa3 # main
+        with:
+          tool: cargo-deny@0.20.2
+          checksum: true
+          fallback: none
+      - run: cargo deny --all-features check all
