@@ -4,7 +4,7 @@ version = "0.4.8"
 authors = ["DaniPopes <57450786+DaniPopes@users.noreply.github.com>"]
 description = "Efficient nibble-sized (4-bit) byte sequence data structure"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.90"
 license = "MIT OR Apache-2.0"
 categories = ["data-structures", "no-std"]
 keywords = ["nibbles", "vector", "ethereum"]
@@ -17,7 +17,7 @@ smallvec = { version = "1.0", default-features = false, features = [
     "const_new",
     "union",
 ] }
-ruint = { version = "1.17.0", default-features = false, features = ["alloc"] }
+ruint = { version = "1.20.0", default-features = false, features = ["alloc"] }
 cfg-if = "1.0"
 
 # serde

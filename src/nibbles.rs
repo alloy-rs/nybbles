@@ -720,6 +720,10 @@ impl Nibbles {
     ///
     /// The caller must ensure that the index is within bounds.
     #[inline]
+    #[allow(
+        clippy::missing_const_for_fn,
+        reason = "the big-endian path uses non-const Cow::to_mut"
+    )]
     pub unsafe fn set_at_unchecked(&mut self, i: usize, value: u8) {
         let byte_index = U256::BYTES - i / 2 - 1;
 
