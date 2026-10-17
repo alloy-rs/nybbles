@@ -8,7 +8,6 @@ rust-version = "1.90"
 license = "MIT OR Apache-2.0"
 categories = ["data-structures", "no-std"]
 keywords = ["nibbles", "vector", "ethereum"]
-homepage = "https://github.com/alloy-rs/nybbles"
 repository = "https://github.com/alloy-rs/nybbles"
 exclude = [".github/", "deny.toml", "release.toml", "rustfmt.toml"]
 
