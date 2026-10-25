@@ -117,7 +117,3 @@ fn manual_batch<T, U>(
 pub fn nibbles_strategy(len: usize) -> impl Strategy<Value = Nibbles> {
     arb_vec(0u8..16, len).prop_map(|v| Nibbles::from_nibbles(v))
 }
-
-// pub fn bytes_strategy(len: usize) -> impl Strategy<Value = Vec<u8>> {
-//     arb_vec(proptest::arbitrary::any::<u8>(), len)
-// }

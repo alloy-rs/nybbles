@@ -11,11 +11,14 @@ pub fn group(criterion: &mut Criterion) {
     //     );
     // }
 
-    // for &size in &SIZE_BYTES {
-    //     bench_arbitrary_with(criterion, &format!("unpack/{size}"), bytes_strategy(size),
-    // |bytes| {         Nibbles::unpack(black_box(&bytes))
-    //     });
-    // }
+    for &size in &SIZE_BYTES {
+        bench_arbitrary_with(
+            criterion,
+            &format!("unpack/{size}"),
+            proptest::arbitrary::any::<[u8; 32]>(),
+            |bytes| Nibbles::unpack(black_box(&bytes[..size])),
+        );
+    }
 
     for &size in &SIZE_BYTES {
         bench_arbitrary_with(
