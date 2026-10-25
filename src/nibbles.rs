@@ -126,8 +126,8 @@ impl core::hash::Hash for Nibbles {
     #[inline]
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         if let Some(arr) = self.as_array() {
-            for word in arr {
-                state.write_u64(*word);
+            for &word in arr {
+                state.write_u64(word);
             }
         } else {
             self.len.hash(state);
