@@ -1,13 +1,13 @@
 use cfg_if::cfg_if;
 use core::{
-    cmp::{self, Ordering},
+    cmp::Ordering,
     fmt,
     mem::MaybeUninit,
     ops::{Bound, Deref, RangeBounds},
     slice,
     str::FromStr,
 };
-use ruint::aliases::U256;
+use ruint::{Uint, aliases::U256};
 use smallvec::SmallVec;
 
 #[cfg(not(feature = "nightly"))]
@@ -112,10 +112,11 @@ type AsArray = [u64; 5];
 impl PartialEq for Nibbles {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        if let Some(arr) = self.as_array()
-            && let Some(other_arr) = other.as_array()
+        if let Some(a) = self.as_array()
+            && let Some(b) = other.as_array()
         {
-            arr == other_arr
+            // Unlike `==`, this does not compile to a `bcmp` call.
+            a.iter().zip(b).fold(0, |acc, (a, b)| acc | (a ^ b)) == 0
         } else {
             self.len == other.len && self.nibbles == other.nibbles
         }
@@ -150,31 +151,53 @@ impl PartialOrd for Nibbles {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
+
+    #[inline]
+    fn lt(&self, other: &Self) -> bool {
+        if let Some(a) = self.as_u320()
+            && let Some(b) = other.as_u320()
+        {
+            a < b
+        } else {
+            self.cmp(other).is_lt()
+        }
+    }
+
+    #[inline]
+    fn le(&self, other: &Self) -> bool {
+        !other.lt(self)
+    }
+
+    #[inline]
+    fn gt(&self, other: &Self) -> bool {
+        other.lt(self)
+    }
+
+    #[inline]
+    fn ge(&self, other: &Self) -> bool {
+        !self.lt(other)
+    }
 }
 
 // Deriving [`Ord`] for [`Nibbles`] is not correct, because they will be compared as unsigned
 // integers without accounting for length. This is incorrect, because `0x1` should be considered
 // greater than `0x02`.
+//
+// Instead, compare `(nibbles, len)` as one 320-bit integer with `len` as the least significant
+// limb. Nibbles are stored most significant first and zero-padded past `len`. If the first
+// differing nibble lies past the shorter length, that side has a zero padding nibble there and
+// the other side a nonzero one, so a prefix sorts first. If one is a prefix of the other, only
+// `len` differs.
 impl Ord for Nibbles {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
-        let self_len = self.byte_len();
-        let other_len = other.byte_len();
-        let l = cmp::min(self_len, other_len);
-        let len_cmp = self.len().cmp(&other.len());
-
-        let byte_idx = longest_prefix_byte(&self.nibbles, &other.nibbles);
-        let r = if byte_idx < l {
-            // SAFETY: `byte_idx` < 32, so `31 - byte_idx` is valid.
-            let le_idx = 31 - byte_idx;
-            let get = |x: &U256| unsafe { *as_le_slice(x).get_unchecked(le_idx) };
-            let a = get(&self.nibbles);
-            let b = get(&other.nibbles);
+        if let Some(a) = self.as_u320()
+            && let Some(b) = other.as_u320()
+        {
             a.cmp(&b)
         } else {
-            Ordering::Equal
-        };
-        core::hint::select_unpredictable(r == Ordering::Equal, len_cmp, r)
+            (self.nibbles, self.len).cmp(&(other.nibbles, other.len))
+        }
     }
 }
 
@@ -1069,6 +1092,12 @@ impl Nibbles {
         }
     }
 
+    /// Returns `[len, limbs...]` as a little-endian 320-bit integer.
+    #[inline]
+    fn as_u320(&self) -> Option<Uint<320, 5>> {
+        self.as_array().map(|a| Uint::from_limbs(*a))
+    }
+
     #[inline]
     const fn as_array(&self) -> Option<&AsArray> {
         cfg_if! {
@@ -1275,17 +1304,7 @@ const fn as_le_slice(x: &U256) -> ByteContainer<'_, { U256::BYTES }> {
 }
 
 #[inline]
-fn longest_prefix_byte(a: &U256, b: &U256) -> usize {
-    longest_prefix::<false>(a, b) / 8
-}
-
-#[inline]
 fn longest_prefix_bit(a: &U256, b: &U256) -> usize {
-    longest_prefix::<true>(a, b)
-}
-
-#[inline]
-fn longest_prefix<const EXACT: bool>(a: &U256, b: &U256) -> usize {
     cfg_if! {
         if #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))] {
             return unsafe {
@@ -1295,7 +1314,7 @@ fn longest_prefix<const EXACT: bool>(a: &U256, b: &U256) -> usize {
                 let diff = _mm256_cmpeq_epi8(x, y);
                 let mask = _mm256_movemask_epi8(diff);
                 let bytes = mask.leading_ones() as usize;
-                if !EXACT || bytes == 32 {
+                if bytes == 32 {
                     return bytes * 8;
                 }
                 let le_idx = 31 - bytes;

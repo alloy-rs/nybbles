@@ -310,8 +310,8 @@ proptest! {
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
     fn ordering_properties(
-        nibbles1 in vec(0u8..16, 0..=32),
-        nibbles2 in vec(0u8..16, 0..=32)
+        nibbles1 in vec(0u8..16, 0..=64),
+        nibbles2 in vec(0u8..16, 0..=64)
     ) {
         let n1 = Nibbles::from_nibbles(&nibbles1);
         let n2 = Nibbles::from_nibbles(&nibbles2);
@@ -320,6 +320,11 @@ proptest! {
         let slice_cmp = nibbles1.cmp(&nibbles2);
         let nibbles_cmp = n1.cmp(&n2);
         prop_assert_eq!(slice_cmp, nibbles_cmp);
+        prop_assert_eq!(nibbles1 < nibbles2, n1 < n2);
+        prop_assert_eq!(nibbles1 <= nibbles2, n1 <= n2);
+        prop_assert_eq!(nibbles1 > nibbles2, n1 > n2);
+        prop_assert_eq!(nibbles1 >= nibbles2, n1 >= n2);
+        prop_assert_eq!(nibbles1 == nibbles2, n1 == n2);
 
         // Test reflexivity
         prop_assert_eq!(n1.cmp(&n1), core::cmp::Ordering::Equal);
