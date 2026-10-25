@@ -7,7 +7,7 @@ use core::{
     slice,
     str::FromStr,
 };
-use ruint::{Uint, aliases::U256};
+use ruint::aliases::{U256, U320};
 use smallvec::SmallVec;
 
 #[cfg(not(feature = "nightly"))]
@@ -116,7 +116,7 @@ impl PartialEq for Nibbles {
             && let Some(b) = other.as_array()
         {
             // Unlike `==`, this does not compile to a `bcmp` call.
-            a.iter().zip(b).fold(0, |acc, (a, b)| acc | (a ^ b)) == 0
+            a.iter().zip(b).fold(0, |acc, (x, y)| acc | (x ^ y)) == 0
         } else {
             self.len == other.len && self.nibbles == other.nibbles
         }
@@ -1094,8 +1094,8 @@ impl Nibbles {
 
     /// Returns `[len, limbs...]` as a little-endian 320-bit integer.
     #[inline]
-    fn as_u320(&self) -> Option<Uint<320, 5>> {
-        self.as_array().map(|a| Uint::from_limbs(*a))
+    fn as_u320(&self) -> Option<U320> {
+        self.as_array().map(|a| U320::from_limbs(*a))
     }
 
     #[inline]
