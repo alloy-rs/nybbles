@@ -45,5 +45,16 @@ pub fn group(criterion: &mut Criterion) {
             }),
             |(nib, suffix)| black_box(&nib).ends_with(black_box(&suffix)),
         );
+
+        bench_arbitrary_with(
+            criterion,
+            &format!("ends_with_odd/{size}"),
+            nibbles_strategy(size).prop_map(|n| {
+                let suffix_start = n.len() - n.len() / 4 - 1;
+                let suffix = n.slice(suffix_start..);
+                (n, suffix)
+            }),
+            |(nib, suffix)| black_box(&nib).ends_with(black_box(&suffix)),
+        );
     }
 }

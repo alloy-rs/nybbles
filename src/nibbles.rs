@@ -653,33 +653,10 @@ impl Nibbles {
     }
 
     /// Returns `true` if this nibble sequence ends with the given suffix.
+    #[inline]
     pub fn ends_with(&self, other: &Self) -> bool {
-        // If other is empty, it's a suffix of any sequence
-        if other.is_empty() {
-            return true;
-        }
-
-        // If other is longer than self, it can't be a suffix
-        if other.len() > self.len() {
-            return false;
-        }
-
-        // Fast path for even-even and odd-odd sequences
-        if self.len() % 2 == other.len() % 2 {
-            return as_le_slice(&self.nibbles)
-                [(NIBBLES - self.len()) / 2..(NIBBLES - self.len() + other.len()) / 2]
-                == as_le_slice(&other.nibbles)[(NIBBLES - other.len()) / 2..];
-        }
-
-        let mut i = 0;
-        while i < other.len() {
-            if self.get_unchecked(self.len() - i - 1) != other.get_unchecked(other.len() - i - 1) {
-                return false;
-            }
-            i += 1;
-        }
-
-        true
+        other.len() <= self.len()
+            && (self.nibbles << ((self.len() - other.len()) * 4)) == other.nibbles
     }
 
     /// Returns the nibble at the given index.
