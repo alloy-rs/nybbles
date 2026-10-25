@@ -378,6 +378,13 @@ impl Nibbles {
     /// let nibbles = Nibbles::from_nibbles_unchecked(&[0xFF]);
     /// assert_eq!(nibbles.to_vec(), vec![0x0F]);
     /// ```
+    ///
+    /// More than 64 nibbles will cause a panic:
+    ///
+    /// ```should_panic
+    /// # use nybbles::Nibbles;
+    /// let nibbles = Nibbles::from_nibbles_unchecked(&[0x01; 65]);
+    /// ```
     #[inline]
     pub fn from_nibbles_unchecked<T: AsRef<[u8]>>(nibbles: T) -> Self {
         let nibbles = nibbles.as_ref();
