@@ -655,8 +655,13 @@ impl Nibbles {
     /// Returns `true` if this nibble sequence ends with the given suffix.
     #[inline]
     pub fn ends_with(&self, other: &Self) -> bool {
-        other.len() <= self.len()
-            && (self.nibbles << ((self.len() - other.len()) * 4)) == other.nibbles
+        if other.len() > self.len() {
+            return false;
+        }
+        let shifted = self.nibbles << ((self.len() - other.len()) * 4);
+        // Compare limb by limb: a vector compare of `shifted` stalls on store forwarding.
+        let (a, b) = (shifted.as_limbs(), other.nibbles.as_limbs());
+        ((a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2]) | (a[3] ^ b[3])) == 0
     }
 
     /// Returns the nibble at the given index.
