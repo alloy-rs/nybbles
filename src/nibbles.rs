@@ -327,7 +327,8 @@ impl Nibbles {
     ///
     /// # Panics
     ///
-    /// Panics if the any of the bytes is not a valid nibble (`0..=0x0f`).
+    /// Panics if the any of the bytes is not a valid nibble (`0..=0x0f`), or if the slice has more
+    /// than 64 nibbles.
     ///
     /// # Examples
     ///
@@ -346,9 +347,9 @@ impl Nibbles {
     #[inline]
     #[track_caller]
     pub fn from_nibbles<T: AsRef<[u8]>>(nibbles: T) -> Self {
-        let bytes = nibbles.as_ref();
-        check_nibbles(bytes);
-        Self::from_iter_unchecked(bytes.iter().copied())
+        let nibbles = nibbles.as_ref();
+        check_nibbles(nibbles);
+        Self::from_nibbles_unchecked(nibbles)
     }
 
     /// Creates a new [`Nibbles`] instance from the given nibbles.
@@ -357,6 +358,10 @@ impl Nibbles {
     /// will store a nibble `2`.
     ///
     /// For checked version, use [`Nibbles::from_nibbles`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the slice has more than 64 nibbles.
     ///
     /// # Examples
     ///
@@ -375,7 +380,22 @@ impl Nibbles {
     /// ```
     #[inline]
     pub fn from_nibbles_unchecked<T: AsRef<[u8]>>(nibbles: T) -> Self {
-        Self::from_iter_unchecked(nibbles.as_ref().iter().copied())
+        let nibbles = nibbles.as_ref();
+        let len = nibbles.len();
+        assert!(len <= NIBBLES);
+        let (chunks, rem) = nibbles.as_chunks::<16>();
+        let mut limbs = [0u64; 4];
+        for (i, chunk) in chunks.iter().enumerate() {
+            limbs[3 - i] = pack16(chunk);
+        }
+        if !rem.is_empty() {
+            let mut acc = 0u64;
+            for &n in rem {
+                acc = (acc << 4) | (n & 0x0f) as u64;
+            }
+            limbs[3 - chunks.len()] = acc << ((16 - rem.len()) * 4);
+        }
+        Self { len, nibbles: U256::from_limbs(limbs) }
     }
 
     /// Converts a byte slice into a [`Nibbles`] instance containing the nibbles (half-bytes or 4
@@ -1193,7 +1213,24 @@ fn check_nibbles(nibbles: &[u8]) {
 }
 
 fn valid_nibbles(nibbles: &[u8]) -> bool {
-    nibbles.iter().all(|&nibble| nibble <= 0xf)
+    nibbles.iter().fold(0, |acc, &nibble| acc | nibble) <= 0xf
+}
+
+/// Packs 16 nibbles, one per byte, into a big-endian limb.
+#[inline(always)]
+fn pack16(chunk: &[u8; 16]) -> u64 {
+    // Packs 8 nibbles, one per byte, into 4 bytes in the same order.
+    #[inline(always)]
+    const fn pack8(x: u64) -> u64 {
+        let x = x & 0x0f0f_0f0f_0f0f_0f0f;
+        let x = ((x << 4) | (x >> 8)) & 0x00ff_00ff_00ff_00ff;
+        let x = (x | (x >> 8)) & 0x0000_ffff_0000_ffff;
+        (x | (x >> 16)) & 0xffff_ffff
+    }
+    let (a, b) = chunk.split_at(8);
+    let a = u64::from_le_bytes(a.try_into().unwrap());
+    let b = u64::from_le_bytes(b.try_into().unwrap());
+    (pack8(a) | (pack8(b) << 32)).swap_bytes()
 }
 
 #[cold]

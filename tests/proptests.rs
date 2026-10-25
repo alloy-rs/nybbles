@@ -28,6 +28,14 @@ proptest! {
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
+    fn from_nibbles_unchecked_masks_high_bits(data in vec(any::<u8>(), 0..=64)) {
+        let nibbles = Nibbles::from_nibbles_unchecked(&data);
+        let expected = data.iter().map(|&n| n & 0x0f).collect::<Vec<_>>();
+        prop_assert_eq!(nibbles.to_vec(), expected);
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "no proptest")]
     fn push_pop_roundtrip(
         initial_nibbles in vec(0u8..16, 0..64),
         extra_nibble in 0u8..16
