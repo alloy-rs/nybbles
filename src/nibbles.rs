@@ -916,7 +916,10 @@ impl Nibbles {
         let len = end - start;
         let mut nibbles = self.nibbles;
         if start != 0 {
-            nibbles <<= start * 4;
+            // `start <= 64`, so the mask only changes `start == 64`, where `len == 0` and
+            // `SLICE_MASKS[0]` clears the result anyway. It lets the compiler drop the
+            // `>= 256` shift-overflow check.
+            nibbles <<= (start * 4) & 0xff;
         }
         Self { len, nibbles: nibbles & SLICE_MASKS[len] }
     }
