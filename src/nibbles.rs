@@ -735,7 +735,7 @@ impl Nibbles {
     pub fn get_unchecked(&self, i: usize) -> u8 {
         self.assert_index(i);
         let byte = as_le_slice(&self.nibbles)[U256::BYTES - i / 2 - 1];
-        if i % 2 == 0 { byte >> 4 } else { byte & 0x0F }
+        (byte << ((i & 1) * 4)) >> 4
     }
 
     /// Sets the nibble at the given index.
