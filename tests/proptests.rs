@@ -309,6 +309,22 @@ proptest! {
 
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
+    fn ends_with_consistency(
+        a in vec(0u8..16, 0..=64),
+        b in vec(0u8..16, 0..=64),
+        suffix_len in 0usize..=64,
+    ) {
+        let na = Nibbles::from_nibbles(&a);
+        let nb = Nibbles::from_nibbles(&b);
+        prop_assert_eq!(na.ends_with(&nb), a.ends_with(&b));
+
+        let suffix_len = suffix_len.min(a.len());
+        let suffix = &a[a.len() - suffix_len..];
+        prop_assert!(na.ends_with(&Nibbles::from_nibbles(suffix)));
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "no proptest")]
     fn ordering_properties(
         nibbles1 in vec(0u8..16, 0..=64),
         nibbles2 in vec(0u8..16, 0..=64)
