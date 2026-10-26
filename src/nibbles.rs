@@ -891,19 +891,11 @@ impl Nibbles {
         #[cfg(debug_assertions)]
         self.slice_check(start, end);
         let len = end - start;
-        if len == 0 {
-            return Self::new();
-        }
-        if len == self.len() {
-            return *self;
-        }
-        let mask = SLICE_MASKS[len];
         let mut nibbles = self.nibbles;
         if start != 0 {
             nibbles <<= start * 4;
         }
-        nibbles &= mask;
-        Self { len, nibbles }
+        Self { len, nibbles: nibbles & SLICE_MASKS[len] }
     }
 
     /// Creates new nibbles containing the nibbles in the specified range.
