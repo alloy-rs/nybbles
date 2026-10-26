@@ -450,6 +450,9 @@ impl Nibbles {
     #[inline]
     #[track_caller]
     pub fn unpack(data: impl AsRef<[u8]>) -> Self {
+        if let Ok(data) = data.as_ref().try_into() {
+            return Self::unpack_array(data);
+        }
         assert!(data.as_ref().len() <= U256::BYTES);
         // SAFETY: we checked that the length is less than or equal to the size of U256
         unsafe { Self::unpack_unchecked(data.as_ref()) }
