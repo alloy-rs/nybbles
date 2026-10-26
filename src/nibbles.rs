@@ -1400,9 +1400,11 @@ mod tests {
 
             assert_eq!(&nibbles.pack()[..], expected, "pack, len: {len}");
 
-            let mut out = vec![0; expected.len()];
+            // The extra byte checks that `pack_to` does not write past the packed length.
+            let mut out = vec![0xff; expected.len() + 1];
             nibbles.pack_to(&mut out);
-            assert_eq!(out, expected, "pack_to, len: {len}");
+            assert_eq!(out[..expected.len()], expected, "pack_to, len: {len}");
+            assert_eq!(out[expected.len()], 0xff, "pack_to overflow, len: {len}");
         }
     }
 
