@@ -1143,7 +1143,8 @@ impl<'a> Iterator for NibblesIter<'a> {
         }
         self.current += 1;
         let byte = as_le_slice(&self.nibbles.nibbles)[U256::BYTES - i / 2 - 1];
-        // Deliberately not `get_unchecked`: its shift select blocks AVX2 vectorization of loops over the iterator.
+        // Deliberately not `get_unchecked`: its shift select blocks AVX2 vectorization of loops
+        // over the iterator.
         Some(if i % 2 == 0 { byte >> 4 } else { byte & 0x0F })
     }
 
