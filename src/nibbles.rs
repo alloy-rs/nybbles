@@ -1137,7 +1137,14 @@ impl<'a> Iterator for NibblesIter<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.nibbles.get(self.current).inspect(|_| self.current += 1)
+        let i = self.current;
+        if i >= self.nibbles.len() {
+            return None;
+        }
+        self.current += 1;
+        let byte = as_le_slice(&self.nibbles.nibbles)[U256::BYTES - i / 2 - 1];
+        // The branchy select keeps loops over the iterator vectorizable with AVX2.
+        Some(if i % 2 == 0 { byte >> 4 } else { byte & 0x0F })
     }
 
     #[inline]
