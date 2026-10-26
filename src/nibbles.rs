@@ -987,35 +987,24 @@ impl Nibbles {
     }
 
     /// Pops a nibble from the end of the current nibbles.
-    pub fn pop(&mut self) -> Option<u8> {
-        if self.is_empty() {
+    #[inline]
+    pub const fn pop(&mut self) -> Option<u8> {
+        let len = self.len();
+        if len == 0 {
             return None;
         }
 
-        // The last nibble is at bit position (64 - length) * 4 from the MSB
-        let shift = (NIBBLES - self.len()) * 4;
-
-        // Extract the nibble - after shifting right, it's in the lowest bits of limb 0
-        let nibble = (self.nibbles >> shift).as_limbs()[0] as u8 & 0xF;
-
-        // Clear the nibble using a more efficient mask creation
-        // Instead of U256::from(0xF_u8) << shift, we can create the mask directly
-        let mask_limb_idx = shift / 64;
-        let mask_shift = shift % 64;
-
-        if mask_limb_idx < 4 {
-            // SAFETY: We know the limb index is valid
-            unsafe {
-                let limbs = self.nibbles.as_limbs_mut();
-                limbs[mask_limb_idx] &= !(0xF << mask_shift);
-            }
-        }
-
-        self.len -= 1;
+        let bit_pos = (NIBBLES - len) * 4;
+        // SAFETY: `bit_pos < 256` because `len > 0`.
+        let limb = unsafe { &mut self.nibbles.as_limbs_mut()[bit_pos / 64] };
+        let nibble = (*limb >> (bit_pos % 64)) as u8 & 0x0F;
+        *limb &= !(0x0F << (bit_pos % 64));
+        self.len = len - 1;
         Some(nibble)
     }
 
     /// Extend the current nibbles with another nibbles.
+    #[inline]
     pub fn extend(&mut self, other: &Nibbles) {
         self.extend_check(other.len());
         if other.is_empty() {
