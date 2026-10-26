@@ -537,8 +537,7 @@ impl Nibbles {
     /// ```
     #[inline]
     pub fn pack(&self) -> SmallVec<[u8; 32]> {
-        let packed_len = self.byte_len();
-        unsafe { smallvec_with(packed_len, |out| self.pack_to_slice_unchecked(out)) }
+        SmallVec::from_buf_and_len(self.nibbles.to_be_bytes::<{ U256::BYTES }>(), self.byte_len())
     }
 
     /// Packs the nibbles into the given slice.
@@ -1163,19 +1162,32 @@ impl<'a> ExactSizeIterator for NibblesIter<'a> {
 unsafe fn pack_to_unchecked(nibbles: &Nibbles, out: &mut [MaybeUninit<u8>]) {
     let byte_len = nibbles.byte_len();
     debug_assert!(out.len() >= byte_len);
-    // Move source pointer to the end of the little endian slice
-    let sl = as_le_slice(&nibbles.nibbles);
-    let mut src = unsafe { sl.as_ptr().add(U256::BYTES) };
-    // Destination pointer is at the beginning of the output slice
-    let mut dst = out.as_mut_ptr().cast::<u8>();
-    // On each iteration, decrement the source pointer by one, set the destination byte, and
-    // increment the destination pointer by one
-    for _ in 0..byte_len {
-        unsafe {
-            src = src.sub(1);
-            *dst = *src;
-            dst = dst.add(1);
+    let bytes = nibbles.nibbles.to_be_bytes::<{ U256::BYTES }>();
+    unsafe {
+        let src = bytes.as_ptr();
+        let dst = out.as_mut_ptr().cast::<u8>();
+        if byte_len >= 16 {
+            copy_overlapping::<16>(src, dst, byte_len);
+        } else if byte_len >= 8 {
+            copy_overlapping::<8>(src, dst, byte_len);
+        } else if byte_len >= 4 {
+            copy_overlapping::<4>(src, dst, byte_len);
+        } else if byte_len >= 2 {
+            copy_overlapping::<2>(src, dst, byte_len);
+        } else if byte_len >= 1 {
+            copy_overlapping::<1>(src, dst, byte_len);
         }
+    }
+}
+
+/// Copies `len >= N` bytes with two possibly overlapping `N`-byte moves.
+#[inline(always)]
+unsafe fn copy_overlapping<const N: usize>(src: *const u8, dst: *mut u8, len: usize) {
+    unsafe {
+        let head = src.cast::<[u8; N]>().read_unaligned();
+        let tail = src.add(len - N).cast::<[u8; N]>().read_unaligned();
+        dst.cast::<[u8; N]>().write_unaligned(head);
+        dst.add(len - N).cast::<[u8; N]>().write_unaligned(tail);
     }
 }
 
@@ -1373,6 +1385,24 @@ mod tests {
                 expected,
                 "input: {input:x?}, expected: {expected:x?}, got: {encoded:x?}",
             );
+        }
+    }
+
+    #[test]
+    fn pack_all_lengths() {
+        for len in 0..=NIBBLES {
+            let raw = (1..16).cycle().take(len).collect::<Vec<u8>>();
+            let expected = raw
+                .chunks(2)
+                .map(|pair| pair[0] << 4 | pair.get(1).copied().unwrap_or(0))
+                .collect::<Vec<u8>>();
+            let nibbles = Nibbles::from_nibbles(&raw);
+
+            assert_eq!(&nibbles.pack()[..], expected, "pack, len: {len}");
+
+            let mut out = vec![0; expected.len()];
+            nibbles.pack_to(&mut out);
+            assert_eq!(out, expected, "pack_to, len: {len}");
         }
     }
 
