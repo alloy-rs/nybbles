@@ -1,15 +1,18 @@
 use crate::prelude::*;
 
 pub fn group(criterion: &mut Criterion) {
-    // TODO: Vec<u8> needs drop, can't batch with codspeed.
-    // for &size in &SIZE_NIBBLES {
-    //     bench_arbitrary_with(
-    //         criterion,
-    //         &format!("from_nibbles/{size}"),
-    //         arb_vec(0u8..16, size),
-    //         |v| Nibbles::from_nibbles(black_box(&v)),
-    //     );
-    // }
+    for &size in &SIZE_NIBBLES {
+        bench_arbitrary_with(
+            criterion,
+            &format!("from_nibbles/{size}"),
+            arb_vec(0u8..16, size).prop_map(|v| {
+                let mut a = [0u8; 64];
+                a[..v.len()].copy_from_slice(&v);
+                a
+            }),
+            |a| Nibbles::from_nibbles(black_box(&a[..size])),
+        );
+    }
 
     // for &size in &SIZE_BYTES {
     //     bench_arbitrary_with(criterion, &format!("unpack/{size}"), bytes_strategy(size),
