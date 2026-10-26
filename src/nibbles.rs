@@ -816,6 +816,15 @@ impl Nibbles {
     #[inline]
     pub fn common_prefix_length(&self, other: &Self) -> usize {
         let l = self.len().min(other.len());
+        // Hashed trie keys usually differ within the top limb, so check it first.
+        let top = self.nibbles.as_limbs()[3] ^ other.nibbles.as_limbs()[3];
+        if top != 0 {
+            return (top.leading_zeros() as usize / 4).min(l);
+        }
+        // The top limb covers the first 16 nibbles, so a shorter side lies fully inside the match.
+        if l <= 16 {
+            return l;
+        }
         self.common_prefix_length_raw(other).min(l)
     }
 
@@ -1319,7 +1328,7 @@ const fn as_le_slice(x: &U256) -> ByteContainer<'_, { U256::BYTES }> {
 fn longest_prefix_bit(a: &U256, b: &U256) -> usize {
     cfg_if! {
         if #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))] {
-            return unsafe {
+            unsafe {
                 use core::arch::x86_64::*;
                 let x = _mm256_loadu_si256(a.as_limbs().as_ptr().cast());
                 let y = _mm256_loadu_si256(b.as_limbs().as_ptr().cast());
@@ -1335,12 +1344,12 @@ fn longest_prefix_bit(a: &U256, b: &U256) -> usize {
                 let diff = a ^ b;
                 let bits = diff.leading_zeros() as usize;
                 bytes * 8 + bits
-            };
+            }
+        } else {
+            let diff = *a ^ *b;
+            diff.leading_zeros()
         }
     }
-
-    let diff = *a ^ *b;
-    diff.leading_zeros()
 }
 
 #[inline]
