@@ -257,13 +257,23 @@ proptest! {
     #[test]
     #[cfg_attr(miri, ignore = "no proptest")]
     fn common_prefix_length_properties(
-        nibbles1 in vec(0u8..16, 0..=64),
-        nibbles2 in vec(0u8..16, 0..=64)
+        shared in vec(0u8..16, 0..=64),
+        suffix1 in vec(0u8..16, 0..=64),
+        suffix2 in vec(0u8..16, 0..=64)
     ) {
-        let n1 = Nibbles::from_nibbles(&nibbles1);
-        let n2 = Nibbles::from_nibbles(&nibbles2);
+        // A shared prefix makes long common prefixes likely.
+        let nibbles1 = [&shared[..], &suffix1[..]].concat();
+        let nibbles1 = &nibbles1[..nibbles1.len().min(64)];
+        let nibbles2 = [&shared[..], &suffix2[..]].concat();
+        let nibbles2 = &nibbles2[..nibbles2.len().min(64)];
+        let n1 = Nibbles::from_nibbles(nibbles1);
+        let n2 = Nibbles::from_nibbles(nibbles2);
 
         let common_len = n1.common_prefix_length(&n2);
+
+        // Should match a naive reference
+        let naive = nibbles1.iter().zip(nibbles2).take_while(|(a, b)| a == b).count();
+        prop_assert_eq!(common_len, naive);
 
         // Should be symmetric
         prop_assert_eq!(common_len, n2.common_prefix_length(&n1));
