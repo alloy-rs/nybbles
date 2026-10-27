@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.9](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.9) - 2026-10-27
+
+### Bug Fixes
+
+- [ci] Pin setup-mold to the v1 tag commit ([#87](https://github.com/alloy-rs/nybbles/issues/87))
+- [ci] Reuse shared deny and refresh runner pins ([#62](https://github.com/alloy-rs/nybbles/issues/62))
+- Preserve changelog history during releases ([#59](https://github.com/alloy-rs/nybbles/issues/59))
+
+### Dependencies
+
+- Bump gh-actions to d5402286 ([#69](https://github.com/alloy-rs/nybbles/issues/69))
+- [ci] Route package installs through Aegis ([#60](https://github.com/alloy-rs/nybbles/issues/60))
+
+### Miscellaneous Tasks
+
+- Commit Cargo.lock and add Cargo Dependabot ([#88](https://github.com/alloy-rs/nybbles/issues/88))
+- [ci] Enable automatic Cyclops PR review ([#75](https://github.com/alloy-rs/nybbles/issues/75))
+- Allow Git dependency sources ([#73](https://github.com/alloy-rs/nybbles/issues/73))
+- Remove redundant package homepages ([#72](https://github.com/alloy-rs/nybbles/issues/72))
+- [ci] Update gh-actions to latest revision ([#71](https://github.com/alloy-rs/nybbles/issues/71))
+- [ci] Use vendored dtolnay/rust-toolchain ([#70](https://github.com/alloy-rs/nybbles/issues/70))
+- [ci] Migrate deny to gh-actions ([#68](https://github.com/alloy-rs/nybbles/issues/68))
+- Update gh-actions and deny workflow pins ([#67](https://github.com/alloy-rs/nybbles/issues/67))
+- Update gh-actions to ee2960a6 ([#66](https://github.com/alloy-rs/nybbles/issues/66))
+- [ci] Use CodSpeed simulation mode ([#65](https://github.com/alloy-rs/nybbles/issues/65))
+- [ci] Scan GitHub Actions workflows ([#64](https://github.com/alloy-rs/nybbles/issues/64))
+- [ci] Update gh-actions pins ([#63](https://github.com/alloy-rs/nybbles/issues/63))
+- [ci] Restore cargo-codspeed installer ([#61](https://github.com/alloy-rs/nybbles/issues/61))
+
+### Performance
+
+- Pack Nibbles from big-endian bytes ([#83](https://github.com/alloy-rs/nybbles/issues/83))
+- Mask the slice_unchecked shift amount ([#84](https://github.com/alloy-rs/nybbles/issues/84))
+- Top-limb fast path in common_prefix_length ([#85](https://github.com/alloy-rs/nybbles/issues/85))
+- Hash Nibbles as five u64 writes ([#77](https://github.com/alloy-rs/nybbles/issues/77))
+- Use unpack_array for 32-byte inputs in unpack ([#82](https://github.com/alloy-rs/nybbles/issues/82))
+- Build U256 16 nibbles at a time in from_nibbles ([#81](https://github.com/alloy-rs/nybbles/issues/81))
+- Branchless Nibbles::ends_with ([#80](https://github.com/alloy-rs/nybbles/issues/80))
+- Branch-free slice_unchecked ([#79](https://github.com/alloy-rs/nybbles/issues/79))
+- Inline extend and pop ([#78](https://github.com/alloy-rs/nybbles/issues/78))
+- Compare Nibbles as 320-bit integers ([#76](https://github.com/alloy-rs/nybbles/issues/76))
+
 ## [0.4.8](https://github.com/alloy-rs/nybbles/releases/tag/v0.4.8) - 2026-02-03
 
 ### Bug Fixes
@@ -22,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.4.8
 - [meta] Add CODEOWNERS
 
 ### Other
